@@ -76,6 +76,7 @@ export default function BookDetail({ book }) {
               priority
               sizes="(max-width: 768px) 100vw, 320px"
               className="object-contain"
+              unoptimized={true}
             />
           </div>
         </div>

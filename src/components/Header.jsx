@@ -69,6 +69,7 @@ export default function Header() {
     { label: "Children's", href: "/category/Y" },        // Y = Children's
     { label: "Language", href: "/category/C" },        // C = Language
     { label: "Games", href: "/category/W" },           // W = Lifestyle/Sport/Leisure (games, puzzles)
+    { label: "E-BOOK", href: "/category/ebooks" },
   ];
 
   const fallbackUtilityMenu = [
@@ -88,6 +89,18 @@ export default function Header() {
     navigation?.utilityMenu && navigation.utilityMenu.length
       ? navigation.utilityMenu
       : fallbackUtilityMenu;
+  const ebookMenuItem = { label: "E-BOOK", href: "/category/ebooks" };
+  const ensureEbookMenuItem = (menu) => {
+    if (!Array.isArray(menu) || menu.length === 0) return [ebookMenuItem];
+    const hasEbook = menu.some((item) => /e-?book/i.test(item?.label || ""));
+    if (hasEbook) return menu;
+    const gamesIndex = menu.findIndex((item) => /games/i.test(item?.label || ""));
+    const insertIndex = gamesIndex >= 0 ? gamesIndex + 1 : menu.length;
+    const nextMenu = [...menu];
+    nextMenu.splice(insertIndex, 0, ebookMenuItem);
+    return nextMenu;
+  };
+  const menuWithEbook = ensureEbookMenuItem(mainMenu);
 
   const resolveIcon = (icon) => {
     if (!icon) return null;
@@ -262,7 +275,7 @@ export default function Header() {
       {/* MOBILE MENU */}
       {mobileMenuOpen && (
         <nav className="lg:hidden border-t text-[#000] border-slate-200 px-4 py-4 space-y-2">
-          {mainMenu.map((item) => {
+          {menuWithEbook.map((item) => {
             const isDropdownMenu = item.enableMegaMenu || item.label === "Highlights";
             const dropdownKey = (item.label || "menu").toLowerCase();
 
@@ -351,7 +364,7 @@ export default function Header() {
         {/* MENU */}
 
         <nav className="flex gap-6  text-[14px] uppercase font-medium text-[#000]">
-          {mainMenu.map((item, index) => {
+          {menuWithEbook.map((item, index) => {
             const isDropdownMenu = item.enableMegaMenu || item.label === "Highlights";
             const dropdownKey = item.label || "Highlights";
 
@@ -366,7 +379,7 @@ export default function Header() {
                   className={`relative flex items-center gap-1 whitespace-nowrap transition
     group-hover:text-[#FF6A00]
     ${
-      index !== mainMenu.length - 1
+      index !== menuWithEbook.length - 1
         ? "after:content-['|'] after:text-[#FF6A00] after:ml-4 after:mr-1"
         : ""
     }

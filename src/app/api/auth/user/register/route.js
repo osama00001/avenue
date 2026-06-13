@@ -60,8 +60,12 @@ export async function POST(req) {
     console.error("Registration Error:", error);
 
     return Response.json(
-      { success: false, message: "Server error, please try again" },
-      { status: 500 }
-    );
-  }
+    {
+      success: false,
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+    },
+    { status: 500 }
+  );
+}
 }

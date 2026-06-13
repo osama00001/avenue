@@ -41,23 +41,37 @@ export default function BannerSlider({
         className="flex transition-transform duration-700 ease-in-out"
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
-        {slides.map(({ id, imageUrl, alt, href }) => (
+        {slides.map(({ id, imageUrl, alt, href }) => {
+          const isLocalhost =
+            imageUrl?.includes("localhost:1337") ||
+            imageUrl?.includes("127.0.0.1:1337");
+          return (
           <Link
             key={id}
             href={href}
             className="min-w-full block relative"
             aria-label={alt}
           >
-            <Image
-              src={imageUrl}
-              alt={alt}
-              width={1200}
-              height={400}
-              className="object-cover w-full h-64 md:h-96"
-              priority={id === 0}
-            />
+            {isLocalhost ? (
+              <img
+                src={imageUrl}
+                alt={alt}
+                className="object-cover w-full h-64 md:h-96"
+                loading={id === 0 ? "eager" : "lazy"}
+              />
+            ) : (
+              <Image
+                src={imageUrl}
+                alt={alt}
+                width={1200}
+                height={400}
+                className="object-cover w-full h-64 md:h-96"
+                priority={id === 0}
+              />
+            )}
           </Link>
-        ))}
+        );
+        })}
       </div>
 
       {/* Navigation dots */}

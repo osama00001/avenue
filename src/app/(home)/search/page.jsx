@@ -46,8 +46,8 @@ function SearchPage() {
       title: product?.descriptiveDetail?.titles?.[0]?.text || "Untitled",
       author: reverseName(
         product?.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-          || product?.descriptiveDetail?.contributors?.[0]?.nameInverted
-          || ""
+        || product?.descriptiveDetail?.contributors?.[0]?.nameInverted
+        || ""
       ),
       price: afterDiscountPrice(originalPrice, discountPercent),
       rrp: originalPrice,
@@ -56,7 +56,7 @@ function SearchPage() {
         ? "Expected delivery soon"
         : "Standard delivery: 2–3 days",
       format: product.format || "Paperback",
-      image: product.coverImage || `/img/placeholder/${(((product._id || "").charCodeAt((product._id || "").length - 1) || 0) % 82) + 1}.jpg`,
+      image: product.coverImage || `/covers/${product.recordReference.split("_")[0] || ""}.jpg`,
     };
   };
 
@@ -259,22 +259,20 @@ function SearchPage() {
                 <div className="flex border border-gray-300 rounded-lg overflow-hidden ml-auto">
                   <button
                     onClick={() => setView("list")}
-                    className={`px-4 py-2 text-sm font-medium transition ${
-                      view === "list"
+                    className={`px-4 py-2 text-sm font-medium transition ${view === "list"
                         ? "bg-[#FF6A00] text-white"
                         : "bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
+                      }`}
                     title="List view"
                   >
                     <FontAwesomeIcon icon={faList} className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setView("grid")}
-                    className={`px-4 py-2 text-sm font-medium transition ${
-                      view === "grid"
+                    className={`px-4 py-2 text-sm font-medium transition ${view === "grid"
                         ? "bg-[#FF6A00] text-white"
                         : "bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
+                      }`}
                     title="Grid view"
                   >
                     <FontAwesomeIcon icon={faThLarge} className="w-4 h-4" />
@@ -462,11 +460,10 @@ function SearchPage() {
                           <button
                             key={pageNum}
                             onClick={() => setCurrentPage(pageNum)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                              currentPage === pageNum
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition ${currentPage === pageNum
                                 ? "bg-[#FF6A00] text-white"
                                 : "border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            }`}
+                              }`}
                           >
                             {pageNum}
                           </button>

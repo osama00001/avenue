@@ -1,11 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import BannerSlider from "@/components/BannerSlider";
 import SaleHighlights from "@/components/SaleHighlights";
 import ProductSlider from "@/components/ProductSlider";
-import BookSlider from "@/components/BookSlider";
 import Link from "next/link";
 import BlogSection from "@/components/BlogSection";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,6 +15,7 @@ import { fetchCart } from "@/store/cartSlice";
 import { fetchCategories } from "@/store/categorySlice";
 import { fetchBlogCategories, fetchBlogs } from "@/store/blogSlice";
 import { useSession } from "next-auth/react";
+import { getStrapiMediaUrl } from "@/lib/strapi";
 
 export default function HomePage() {
   const {
@@ -41,7 +41,7 @@ export default function HomePage() {
   } = useSelector((state) => state.book);
 
   const { user } = useSelector((state) => state.user);
-  const { list:blogList, categories:blogCategories, loading:blogLoading, categoryLoading } = useSelector(
+  const { list: blogList, categories: blogCategories, loading: blogLoading, categoryLoading } = useSelector(
     (s) => s.blog
   );
 
@@ -61,6 +61,15 @@ export default function HomePage() {
   const [row12, setRow12] = useState([]);
   const [row13, setRow13] = useState([]);
   const [row14, setRow14] = useState([]);
+  const [bannerSlides, setBannerSlides] = useState([]);
+  const [promoSlides, setPromoSlides] = useState([]);
+  const [stripBanner, setStripBanner] = useState(null);
+  const [bottomBanner, setBottomBanner] = useState(null);
+  const [middleBanner, setMiddleBanner] = useState(null);
+  const [mainBanner, setMainBanner] = useState(null);
+  const [quickLinks, setQuickLinks] = useState([]);
+  const [strapiPending, setStrapiPending] = useState(6);
+
 
   const { status: sessionStatus } = useSession();
 
@@ -112,6 +121,211 @@ export default function HomePage() {
     dispatch(fetchBlogCategories());
   }, []);
 
+  useEffect(() => {
+    const loadBannerSlides = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-banner");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        const attributes = entry?.attributes ?? entry;
+        const slides = attributes?.slides || [];
+
+        const resolved = slides
+          .map((slide, index) => {
+            const image =
+              slide.imageUrl ||
+              slide.image?.url ||
+              slide.image?.data?.attributes?.url ||
+              slide.image?.data?.url;
+            const imageUrl = getStrapiMediaUrl(image);
+            if (!imageUrl) return null;
+            return {
+              id: slide.id ?? index,
+              imageUrl,
+              alt: slide.alt || slide.title || "Banner",
+              href: slide.href || "/",
+              order: slide.order ?? index,
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.order - b.order);
+
+        if (resolved.length) {
+          setBannerSlides(resolved);
+        }
+      } catch (err) {
+        console.error("[home] failed to load banner slides", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadBannerSlides();
+  }, []);
+
+  useEffect(() => {
+    const loadPromoSlides = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-promo");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        const attributes = entry?.attributes ?? entry;
+        const slides = attributes?.slides || [];
+        const resolved = slides
+          .map((slide, index) => {
+            const image =
+              slide.imageUrl ||
+              slide.image?.url ||
+              slide.image?.data?.attributes?.url ||
+              slide.image?.data?.url;
+            const imageUrl = getStrapiMediaUrl(image);
+            if (!imageUrl) return null;
+            return {
+              id: slide.id ?? index,
+              title: slide.title || "Promo",
+              link: slide.href || "/",
+              image: imageUrl,
+              order: slide.order ?? index,
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.order - b.order);
+
+        if (resolved.length) {
+          setPromoSlides(resolved);
+        }
+      } catch (err) {
+        console.error("[home] failed to load promo slides", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadPromoSlides();
+  }, []);
+
+  useEffect(() => {
+    const loadStripBanner = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-strip");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        if (entry?.imageUrl) {
+          setStripBanner(entry);
+        }
+      } catch (err) {
+        console.error("[home] failed to load strip banner", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadStripBanner();
+  }, []);
+
+  useEffect(() => {
+    const loadBottomBanner = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-bottom-banner");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        if (entry?.imageUrl) {
+          setBottomBanner(entry);
+        }
+      } catch (err) {
+        console.error("[home] failed to load bottom banner", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadBottomBanner();
+  }, []);
+
+  useEffect(() => {
+    const loadMiddleBanner = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-middle-banner");
+        if (!res.ok) return;
+        const payload = await res.json();
+        console.warn(payload, "payload")
+        const entry = payload?.data;
+        if (entry?.imageUrl) {
+          setMiddleBanner(entry);
+        }
+      } catch (err) {
+        console.error("[home] failed to load middle banner", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadMiddleBanner();
+  }, []);
+
+  useEffect(() => {
+    const loadMainBanner = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-main-banner");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        if (entry?.imageUrl) {
+          setMainBanner(entry);
+        }
+      } catch (err) {
+        console.error("[home] failed to load main banner", err);
+      } finally {
+        setStrapiPending((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    loadMainBanner();
+  }, []);
+
+  useEffect(() => {
+    const loadQuickLinks = async () => {
+      try {
+        const res = await fetch("/api/strapi/home-quick-links");
+        if (!res.ok) return;
+        const payload = await res.json();
+        const entry = payload?.data;
+        const attributes = entry?.attributes ?? entry;
+        const items = (attributes?.items || [])
+          .map((item, index) => {
+            const image =
+              item.imageUrl ||
+              item.image?.url ||
+              item.image?.data?.attributes?.url ||
+              item.image?.data?.url;
+            const imageUrl = getStrapiMediaUrl(image);
+            if (!imageUrl) return null;
+            return {
+              id: item.id ?? index,
+              label: item.label,
+              iconSrc: imageUrl,
+              href: item.href || "/",
+              order: item.order ?? index,
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.order - b.order);
+
+        if (items.length) {
+          setQuickLinks(items);
+        }
+      } catch (err) {
+        console.error("[home] failed to load quick links", err);
+      }
+    };
+
+    loadQuickLinks();
+  }, []);
+
   // Only fetch user when a session is confirmed Ã¢â‚¬â€ avoids 401 noise for guests
   useEffect(() => {
     if (sessionStatus === "authenticated") {
@@ -139,10 +353,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -153,10 +367,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -167,10 +381,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -181,10 +395,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -195,10 +409,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -209,10 +423,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: true,
       }));
@@ -223,10 +437,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -237,10 +451,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -251,10 +465,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -265,10 +479,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0]|| ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -279,10 +493,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -293,10 +507,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -307,10 +521,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -321,10 +535,10 @@ export default function HomePage() {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));
@@ -414,6 +628,7 @@ export default function HomePage() {
       href: "/childrens",
     },
   ];
+  const highlights2Resolved = quickLinks.length ? quickLinks : highlights2;
 
   const products = [
     {
@@ -508,7 +723,7 @@ export default function HomePage() {
 
   const products2 = [...products];
 
-  const slides = [
+  const fallbackPromoSlides = [
     {
       title: "PROTEIN in 15",
       subtitle: "Protein packed meals from the Body Coach",
@@ -534,8 +749,12 @@ export default function HomePage() {
       image: "/img/sprinkbanner/speinklink.webp",
     },
   ];
+  const promoSlidesResolved = promoSlides.length
+    ? promoSlides
+    : fallbackPromoSlides;
+  const promoBanner = promoSlidesResolved[0];
 
-  const banners = [
+  const fallbackBanners = [
     {
       id: 1,
       imageUrl: "/banner/1.png",
@@ -567,6 +786,19 @@ export default function HomePage() {
       href: "/",
     },
   ];
+  const banners = bannerSlides.length ? bannerSlides : fallbackBanners;
+  const strapiLoading = strapiPending > 0;
+
+  if (strapiLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#FF6A00] border-t-transparent" />
+        <p className="text-sm uppercase tracking-[0.3em] text-slate-600">
+          Loading...
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="bg-white">
       <BannerSlider
@@ -592,7 +824,31 @@ export default function HomePage() {
         loop
       />
 
-      <BookSlider slidespace={40} slidesitem={3} slides={slides} />
+      <div className="page-width">
+        <Link
+          href={promoBanner?.link || "/"}
+          className="min-w-full block relative"
+        >
+          {promoBanner?.image &&
+            (promoBanner.image.includes("localhost:1337") ||
+              promoBanner.image.includes("127.0.0.1:1337")) ? (
+            <img
+              src={promoBanner.image}
+              alt={promoBanner.title || "Promo"}
+              className="object-cover w-full"
+              loading="lazy"
+            />
+          ) : (
+            <Image
+              src={promoBanner?.image || "/img/sprinkbanner/joewiocl.webp"}
+              alt={promoBanner?.title || "Promo"}
+              width={1400}
+              height={200}
+              className="object-cover w-full"
+            />
+          )}
+        </Link>
+      </div>
 
       <ProductSlider
         title="Everyone's Talking About..."
@@ -650,14 +906,28 @@ export default function HomePage() {
       />
 
       <div className="page-width">
-        <Link href="/" className="min-w-full block relative">
-          <Image
-            src="/img/image_slider.webp"
-            alt="image_slider"
-            width={1400}
-            height={200}
-            className="object-cover w-full"
-          />
+        <Link
+          href={stripBanner?.href || "/"}
+          className="min-w-full block relative"
+        >
+          {stripBanner?.imageUrl &&
+            (stripBanner.imageUrl.includes("localhost:1337") ||
+              stripBanner.imageUrl.includes("127.0.0.1:1337")) ? (
+            <img
+              src={stripBanner.imageUrl}
+              alt={stripBanner.alt || stripBanner.title || "Banner"}
+              className="object-cover w-full"
+              loading="lazy"
+            />
+          ) : (
+            <Image
+              src={stripBanner?.imageUrl || "/img/image_slider.webp"}
+              alt={stripBanner?.alt || stripBanner?.title || "image_slider"}
+              width={1400}
+              height={200}
+              className="object-cover w-full"
+            />
+          )}
         </Link>
       </div>
 
@@ -684,14 +954,28 @@ export default function HomePage() {
       />
 
       <div className="page-width">
-        <Link href="/" className="min-w-full block relative">
-          <Image
-            src="/img/main_bannerbottom.jpeg"
-            alt="image_slider"
-            width={1400}
-            height={200}
-            className="object-cover w-full"
-          />
+        <Link
+          href={mainBanner?.href || "/"}
+          className="min-w-full block relative"
+        >
+          {mainBanner?.imageUrl &&
+            (mainBanner.imageUrl.includes("localhost:1337") ||
+              mainBanner.imageUrl.includes("127.0.0.1:1337")) ? (
+            <img
+              src={mainBanner.imageUrl}
+              alt={mainBanner.alt || mainBanner.title || "Banner"}
+              className="object-cover w-full"
+              loading="lazy"
+            />
+          ) : (
+            <Image
+              src={mainBanner?.imageUrl || "/img/main_bannerbottom.jpeg"}
+              alt={mainBanner?.alt || mainBanner?.title || "image_slider"}
+              width={1400}
+              height={200}
+              className="object-cover w-full"
+            />
+          )}
         </Link>
       </div>
 
@@ -719,7 +1003,7 @@ export default function HomePage() {
 
       <SaleHighlights
         saletitle="You May Be Looking For..."
-        highlights={highlights2}
+        highlights={highlights2Resolved}
       />
 
       <ProductSlider
@@ -734,14 +1018,28 @@ export default function HomePage() {
       />
 
       <div className="page-width">
-        <Link href="/" className="min-w-full block relative">
-          <Image
-            src="/img/bottom-2banner.jpeg"
-            alt="image_slider"
-            width={1400}
-            height={200}
-            className="object-cover w-full"
-          />
+        <Link
+          href={middleBanner?.href || "/"}
+          className="min-w-full block relative"
+        >
+          {middleBanner?.imageUrl &&
+            (middleBanner.imageUrl.includes("localhost:1337") ||
+              middleBanner.imageUrl.includes("127.0.0.1:1337")) ? (
+            <img
+              src={middleBanner.imageUrl}
+              alt={middleBanner.alt || middleBanner.title || "Banner"}
+              className="object-cover w-full"
+              loading="lazy"
+            />
+          ) : (
+            <Image
+              src={middleBanner?.imageUrl || "/img/bottom-2banner.jpeg"}
+              alt={middleBanner?.alt || middleBanner?.title || "image_slider"}
+              width={1400}
+              height={200}
+              className="object-cover w-full"
+            />
+          )}
         </Link>
       </div>
 
@@ -779,14 +1077,28 @@ export default function HomePage() {
       />
 
       <div className="page-width">
-        <Link href="/" className="min-w-full block relative">
-          <Image
-            src="/img/bottom-3banner.jpeg"
-            alt="image_slider"
-            width={1400}
-            height={200}
-            className="object-cover w-full"
-          />
+        <Link
+          href={bottomBanner?.href || "/"}
+          className="min-w-full block relative"
+        >
+          {bottomBanner?.imageUrl &&
+            (bottomBanner.imageUrl.includes("localhost:1337") ||
+              bottomBanner.imageUrl.includes("127.0.0.1:1337")) ? (
+            <img
+              src={bottomBanner.imageUrl}
+              alt={bottomBanner.alt || bottomBanner.title || "Banner"}
+              className="object-cover w-full"
+              loading="lazy"
+            />
+          ) : (
+            <Image
+              src={bottomBanner?.imageUrl || "/img/bottom-3banner.jpeg"}
+              alt={bottomBanner?.alt || bottomBanner?.title || "image_slider"}
+              width={1400}
+              height={200}
+              className="object-cover w-full"
+            />
+          )}
         </Link>
       </div>
 

@@ -52,12 +52,13 @@ export default function ProductCard({ product }) {
       {/* IMAGE */}
       <div className="relative w-full h-[340px] overflow-hidden bg-gray-100 flex items-center justify-center">
         {image && image.length > 5 && !image.includes("undefined") && !imgError ? (
-          <Image 
-            src={image} 
-            alt={title} 
-            fill 
-            className="object-contain" 
+          <Image
+            src={image}
+            alt={title}
+            fill
+            className="object-contain"
             onError={() => setImgError(true)}
+            unoptimized={true}
           />
         ) : (
           <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">

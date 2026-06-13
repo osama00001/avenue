@@ -271,6 +271,23 @@ img:-moz-broken { visibility: hidden; }
   text-decoration: underline;
 }
 
+.cms-content ul,
+.cms-content ol {
+  margin: 0 0 16px 20px;
+}
+
+.cms-content ul {
+  list-style: disc;
+}
+
+.cms-content ol {
+  list-style: decimal;
+}
+
+.cms-content li {
+  margin-bottom: 6px;
+}
+
 .cms-content table {
   width: 100%;
   border-collapse: collapse;
@@ -289,6 +306,14 @@ img:-moz-broken { visibility: hidden; }
   background: #f2f2f2;
   font-weight: 600;
   text-align: left;
+}
+
+.cms-pre {
+  white-space: pre-wrap;
+  font-family: var(--font-cms-body), "Source Sans 3", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #3b3b3b;
 }
 
 @media (max-width: 768px) {

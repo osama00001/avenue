@@ -13,16 +13,14 @@ import api from "@/lib/api";
  */
 
 const SECTIONS = [
-  { label: "Bestsellers",   slug: "bestsellers",       category: "bestsellers" },
-  { label: "New Arrivals",  slug: "new-arrivals",      category: "popular" },
-  { label: "Editor's Picks",slug: "editor-picks",      category: "special_editions" },
+  { label: "Bestsellers", slug: "bestsellers", category: "bestsellers" },
+  { label: "New Arrivals", slug: "new-arrivals", category: "popular" },
+  { label: "Editor's Picks", slug: "editor-picks", category: "special_editions" },
 ];
 
 function imageFor(book) {
   if (book?.coverImage) return book.coverImage;
-  const id = book?._id || "";
-  const idx = ((id.charCodeAt(id.length - 1) || 0) % 82) + 1;
-  return `/img/placeholder/${idx}.jpg`;
+  return `/covers/${book.recordReference.split("_")[0] || ""}.jpg`;
 }
 
 function titleOf(book) {

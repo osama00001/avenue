@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { Libre_Baskerville, Source_Sans_3 } from "next/font/google";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import rehypeRaw from "rehype-raw";
 import CmsPage from "@/models/CmsPage";
 import { TEMPLATE_REGISTRY } from "@/components/templates/registry";
 import { connectDB } from "@/lib/db";
 import CmsNotFound from "@/components/CmsNotFound";
 import { getStrapiCollection, getStrapiPageBySlug } from "@/lib/strapi";
-import parse from "html-react-parser";
 
 const cmsHeadingFont = Libre_Baskerville({
   subsets: ["latin"],
@@ -19,6 +22,26 @@ const cmsBodyFont = Source_Sans_3({
   weight: ["400", "500", "600", "700"],
   variable: "--font-cms-body",
 });
+
+const renderCmsContent = (content) => {
+  if (!content) return null;
+  if (typeof content !== "string") {
+    return (
+      <pre className="cms-pre">
+        {JSON.stringify(content, null, 2)}
+      </pre>
+    );
+  }
+
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkBreaks]}
+      rehypePlugins={[rehypeRaw]}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+};
 
 export default async function Page({ params }) {
   const { slug } = await params;
@@ -90,7 +113,7 @@ export default async function Page({ params }) {
             )}
             <div className="cms-article">
               {title && <h1 className="cms-title">{title}</h1>}
-              <div className="cms-content">{content ? parse(content) : null}</div>
+              <div className="cms-content">{renderCmsContent(content)}</div>
             </div>
           </div>
         </div>

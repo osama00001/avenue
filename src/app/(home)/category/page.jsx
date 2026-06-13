@@ -83,7 +83,7 @@ const Category = () => {
               key={book._id}
               product={{
                 ...book,
-                image: book.coverImage,
+                image: book.coverImage || `/covers/${book.recordReference.split("_")[0] || ""}.jpg`,
               }}
             />
           ))}
@@ -106,11 +106,10 @@ const Category = () => {
                 <button
                   key={p}
                   onClick={() => goToPage(p)}
-                  className={`px-3 py-1.5 text-sm rounded border transition ${
-                    p === page
+                  className={`px-3 py-1.5 text-sm rounded border transition ${p === page
                       ? "bg-[#FF6A00] text-white border-[#FF6A00] font-semibold"
                       : "bg-white border-gray-300 hover:bg-[#FF6A00] hover:text-white hover:border-[#FF6A00]"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>

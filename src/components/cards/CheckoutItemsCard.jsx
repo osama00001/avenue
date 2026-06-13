@@ -40,13 +40,14 @@ const CheckoutItemCard = ({ item }) => {
     <div className="bg-white rounded-xl shadow p-4 flex gap-4">
       {/* Image wrapper */}
       <div className="relative w-20 h-28 flex-shrink-0 overflow-hidden rounded-md bg-gray-100 flex items-center justify-center">
-        {item?.book?.coverImage ? (
+        {item?.book?.coverImage || item?.book?.recordReference ? (
           <Image
-            src={item.book.coverImage}
+            src={item.book.coverImage || `/covers/${item.book.recordReference.split("_")[0] || ""}.jpg`}
             alt={title}
             fill
             className="object-contain"
             sizes="80px"
+            unoptimized={true}
           />
         ) : (
           <span className="text-gray-400 text-[8px] text-center px-1">{title}</span>

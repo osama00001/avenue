@@ -15,7 +15,7 @@
  *   node src/scripts/sync-covers.js --no-link   → download only, skip Mongo writes
  *
  * After download:
- *   - Files are saved to public/covers/{ISBN13}.{ext}
+ *   - Files are saved to covers_storage/{ISBN13}.{ext}
  *   - Book.coverImage updated to "/covers/{ISBN13}.{ext}" UNLESS --no-link
  *
  * Concurrent runs: if sync-biblio (or any heavy Mongo writer) is running,
@@ -36,7 +36,7 @@ import { connectCovers } from './ftp-client.js';
 
 const COVERS_BASE_DIR   = '/EBooks/640s/Complete';   // confirmed
 const COVERS_UPDATE_DIR = '/EBooks/640s/Update';     // weekly ZIPs
-const COVERS_LOCAL_DIR  = path.resolve(process.cwd(), 'public', 'covers');
+const COVERS_LOCAL_DIR  = path.resolve(process.cwd(),'covers_storage');
 const SCRATCH_DIR       = path.join(os.tmpdir(), 'avenue-covers');
 const DB_BATCH_SIZE     = 200;
 
@@ -176,7 +176,7 @@ async function runFull(conn) {
 
   for (const dir of dirs) {
     const prefixPath = `${COVERS_BASE_DIR}/${dir.name}`;
-
+    console.log(`[sync-covers] saving images from ${dir.name}.\n`);
     // Rate limit so Microsoft IIS FTP doesn't kill our control socket
     if (stats.dirs > 0) await new Promise(r => setTimeout(r, FTP_RATE_LIMIT_MS));
 

@@ -8,6 +8,16 @@ export const revalidate = 0;
 const VALID_BIC_LETTERS = new Set(
   ["A","B","C","D","E","F","G","H","J","K","L","M","N","P","R","S","T","U","V","W","Y"]
 );
+const EBOOK_FORMS = ["DG", "EB", "ED", "EA"];
+const EBOOK_FORM_DETAILS = ["E101", "E104","DG", "EB", "ED", "EA"];
+const EBOOK_FILTER = {
+  $or: [
+    { "descriptiveDetail.productForm": { $in: EBOOK_FORMS } },
+    { "descriptiveDetail.productFormDetail": { $in: EBOOK_FORM_DETAILS } },
+    { type: "ebook" },
+    { "ebookCategories.0": { $exists: true } },
+  ],
+};
 
 // 3 months ago as ONIX-style YYYYMMDD
 function recentDateStr() {
@@ -27,6 +37,7 @@ const CATEGORY_BUILDERS = {
   adult_books:    () => ({ "descriptiveDetail.subjects.code": { $regex: "^[CDE]" } }),
   games:          () => ({ "descriptiveDetail.subjects.code": { $regex: "^W" } }),
   gift_books:     () => ({ "descriptiveDetail.subjects.code": { $regex: "^W" } }),
+  ebooks:         () => (EBOOK_FILTER),
 
   // Special, non-BIC categories
   bestsellers:       () => ({ "descriptiveDetail.subjects.code": { $regex: "^H" } }),               // Humanities / Religion
@@ -61,10 +72,12 @@ export async function GET(req) {
     // Case-sensitive anchored regex so the index gets used. BIC is uppercase.
     if (categoryParam && isDirectBicCode(categoryParam)) {
       const code = categoryParam.trim().toUpperCase();
-      const filter = {
+      let filter = {
         "descriptiveDetail.subjects.code": { $regex: `^${escRegex(code)}` },
       };
-
+	if(code == "EBOOKS"){
+	  filter = EBOOK_FILTER
+	}
       const [books, totalBooks] = await Promise.all([
         Book.find(filter).sort(SORT).skip(skip).limit(perPage).lean(),
         Book.countDocuments(filter),

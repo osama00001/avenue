@@ -12,7 +12,7 @@ export default function BookPage({ params }) {
   const { id } = use(params);
 
   const dispatch = useDispatch();
-  const { books, loading} = useSelector((state) => state.book);
+  const { books, loading } = useSelector((state) => state.book);
   const [book, setBook] = useState([]);
 
   useEffect(() => {
@@ -25,10 +25,10 @@ export default function BookPage({ params }) {
         ...item,
         author: reverseName(
           item.descriptiveDetail?.contributors?.find(c => c.role === "A01")?.nameInverted
-            || item.descriptiveDetail?.contributors?.[0]?.nameInverted
-            || ""
+          || item.descriptiveDetail?.contributors?.[0]?.nameInverted
+          || ""
         ),
-        image: item.coverImage || `/img/placeholder/${(((item._id || "").charCodeAt((item._id || "").length - 1) || 0) % 82) + 1}.jpg`,
+        image: item.coverImage || `/covers/${item.recordReference.split("_")[0] || ""}.jpg`,
         format: "Paperback",
         preorder: false,
       }));

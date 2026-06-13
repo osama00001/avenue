@@ -115,12 +115,13 @@ export default function CartPage() {
                     <div className="grid sm:grid-cols-4 gap-6">
                       {/* IMAGE */}
                       <div className="relative h-32 bg-gray-100 flex items-center justify-center">
-                        {book.coverImage ? (
+                        {book.coverImage || book.recordReference ? (
                           <Image
-                            src={book.coverImage}
+                            src={book.coverImage || `/covers/${book.recordReference.split("_")[0]}.jpg`}
                             alt={title}
                             fill
                             className="object-contain"
+                            unoptimized={true}
                           />
                         ) : (
                           <span className="text-gray-400 text-[10px] text-center px-2">{title}</span>
@@ -188,7 +189,7 @@ export default function CartPage() {
                                 })
                               );
 
-                              if(response?.type ==="cart/remove/fulfilled"){
+                              if (response?.type === "cart/remove/fulfilled") {
                                 toast.success("Item removed from cart");
                               }
 
