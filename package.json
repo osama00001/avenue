@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:admin": "node src/scripts/seedAdmin.js"
+    "seed:admin": "node src/scripts/seedAdmin.js",
+    "sync:covers": "node src/scripts/sync-covers.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
@@ -47,7 +49,11 @@
     "react-hook-form": "^7.70.0",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
+    "rehype-raw": "^7.0.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "saxes": "^6.0.0",
     "sonner": "^2.0.7",
     "ssh2-sftp-client": "^12.1.1",
