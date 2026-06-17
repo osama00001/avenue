@@ -1,9 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-
-import CheckoutItemCard from "@/components/cards/CheckoutItemsCard";
-import AddAddressForm from "@/components/forms/AddAddressForm";
+import Link from "next/link";
+import { signIn } from "next-auth/react";
 
 import { clearCart, fetchCart } from "@/store/cartSlice";
 import { fetchUserDetails } from "@/store/userSlice";
@@ -11,42 +10,135 @@ import { placeCODOrder } from "@/store/orderSlice";
 import { fetchAddresses } from "@/store/addressSlice";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faEye,
+  faEyeSlash,
+} from "@fortawesome/free-solid-svg-icons";
+import { FaPaypal, FaRegCreditCard, FaMoneyBillWave } from "react-icons/fa";
+
 import PayPalButton from "@/components/PayPalButton";
 import StripeButton from "@/components/StripeButton";
-import PaymentMethodSelector from "@/components/PaymentMethodSelector";
+import CheckoutSteps from "@/components/checkout/CheckoutSteps";
+import OrderSidebar from "@/components/checkout/OrderSidebar";
+import AddAddressForm from "@/components/forms/AddAddressForm";
+
+const EMPTY_FORM = {
+  hasAccount: "no",
+  email: "",
+  firstName: "",
+  lastName: "",
+  phone: "",
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "United Kingdom",
+};
 
 const Page = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  // ================= INIT FETCH =================
+
   useEffect(() => {
     dispatch(fetchCart());
     dispatch(fetchUserDetails());
   }, [dispatch]);
 
   const { items = [], loading } = useSelector((s) => s.cart);
-  const { user } = useSelector((s) => s.user);
+  const { user, isLogin } = useSelector((s) => s.user);
   const { placing, selectedOrder } = useSelector((s) => s.orders);
-  const { list: addresses } = useSelector((s) => s.address);
+  const { list: addresses, loading: addressesLoading } = useSelector(
+    (s) => s.address
+  );
 
+  const [phase, setPhase] = useState("delivery"); // "delivery" | "payment"
+  const [form, setForm] = useState(EMPTY_FORM);
   const [selectedAddress, setSelectedAddress] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [method, setMethod] = useState("stripe"); // default to stripe
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [method, setMethod] = useState("stripe");
 
-  // fetch addresses when user loaded
+  const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
   useEffect(() => {
-    if (user?._id) {
-      dispatch(fetchAddresses(user._id));
-    }
+    if (user?._id) dispatch(fetchAddresses(user._id));
   }, [user, dispatch]);
 
-  // auto select default
   useEffect(() => {
-    if (addresses.length > 0 && !selectedAddress) {
+    if (!isLogin || !addresses.length) return;
+    setShowAddAddress(false);
+    setSelectedAddressId((prev) => {
+      if (prev && prev !== "new" && addresses.some((a) => a._id === prev)) {
+        return prev;
+      }
       const def = addresses.find((a) => a.isDefault) || addresses[0];
-      setSelectedAddress(def);
+      return def?._id ?? null;
+    });
+
+  }, [isLogin, addresses]);
+
+  useEffect(() => {
+    if (isLogin && addresses.length === 0 && !addressesLoading) {
+      setShowAddAddress(true);
+      setSelectedAddressId("new");
     }
-  }, [addresses]);
+  }, [isLogin, addresses.length, addressesLoading]);
+
+  const addressToShipping = (addr) => ({
+    label: addr.label || "Delivery",
+    name: addr.name,
+    email: user?.email || form.email,
+    phone: addr.phone,
+    line1: addr.line1,
+    line2: addr.line2 || "",
+    city: addr.city,
+    state: addr.state,
+    postalCode: addr.postalCode,
+    country: addr.country,
+  });
+
+  const handleCheckoutLogin = async (e) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginLoading(true);
+
+    try {
+      const res = await signIn("credentials", {
+        email: loginEmail,
+        password: loginPassword,
+        redirect: false,
+      });
+
+      if (!res || res.error) {
+        setLoginError("Invalid email or password");
+        return;
+      }
+
+      if (items.length > 0) {
+        await fetch("/api/cart/merge", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const userData = await dispatch(fetchUserDetails()).unwrap();
+      if (userData?._id) dispatch(fetchAddresses(userData._id));
+      
+      toast.success("Signed in successfully");
+    } catch {
+      setLoginError("Something went wrong. Please try again.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   // ================= PRICING =================
   const getPrice = (book) => {
@@ -59,223 +151,475 @@ const Page = () => {
     (sum, i) => sum + getPrice(i.book) * i.quantity,
     0
   );
-
+  const itemCount = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
   const shippingCost = subtotal > 25 ? 0 : 2.99;
   const total = subtotal + shippingCost;
 
   useEffect(() => {
-    if (selectedOrder?._id) {
-      router.push(`/thank-you/${selectedOrder._id}`);
-    }
+    if (selectedOrder?._id) router.push(`/thank-you/${selectedOrder._id}`);
   }, [selectedOrder]);
 
   // ================= COD =================
   const handleCOD = async () => {
-    // ============================
-    // VALIDATION
-    // ============================
     if (!selectedAddress) {
-      toast.error("Please select a shipping address");
+      toast.error("Please complete your delivery details");
       return;
     }
-
     if (!items.length) {
-      toast.error("Cart is empty");
+      toast.error("Basket is empty");
       return;
     }
 
     try {
-      // ============================
-      // BUILD PAYLOAD
-      // ============================
       const cartPayload = items.map((item) => ({
         bookId: item.book._id,
         quantity: item.quantity,
         ebookFormat: item.ebookFormat || null,
       }));
 
-      // ============================
-      // PLACE ORDER
-      // ============================
       const order = await dispatch(
         placeCODOrder({
-          userId: user._id,
+          userId: user?._id,
           cart: cartPayload,
           shippingAddress: selectedAddress,
         })
       ).unwrap();
 
-      // ============================
-      // FRONTEND CART CLEAR
-      // ============================
       dispatch(clearCart());
-
-      // ============================
-      // SUCCESS UX
-      // ============================
       toast.success("Order placed successfully!");
-
-      // Navigate to thank you page with order id
       router.push(`/checkout/thank-you?order=${order._id}`);
     } catch (err) {
       console.error(err);
-
       toast.error(err?.message || "Something went wrong placing order");
     }
   };
 
-  const handlePaymentSelect = (method) => {
-    setMethod(method);
+  const goToPayment = () => {
+    if (isLogin) {
+      if (selectedAddressId === "new" || showAddAddress) {
+        toast.error("Please save a delivery address first");
+        return;
+      }
+      const addr = addresses.find((a) => a._id === selectedAddressId);
+      if (!addr) {
+        toast.error("Please select a delivery address");
+        return;
+      }
+      setSelectedAddress(addressToShipping(addr));
+    } else if (form.hasAccount === "yes") {
+      toast.error("Please sign in to continue");
+      return;
+    } else {
+      const required = {
+        email: "Email",
+        firstName: "First name",
+        lastName: "Last name",
+        phone: "Phone",
+        line1: "Address",
+        city: "City",
+        state: "State / County",
+        postalCode: "Postal code",
+        country: "Country",
+      };
+      const missing = Object.keys(required).filter((k) => !form[k]?.trim());
+      if (missing.length) {
+        toast.error(
+          `Please fill in: ${missing.map((k) => required[k]).join(", ")}`
+        );
+        return;
+      }
+
+      setSelectedAddress({
+        label: "Delivery",
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.phone,
+        line1: form.line1,
+        line2: form.line2,
+        city: form.city,
+        state: form.state,
+        postalCode: form.postalCode,
+        country: form.country,
+      });
+    }
+
+    setPhase("payment");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleStepClick = (stepId) => {
+    if (stepId === "delivery") setPhase("delivery");
+    if (stepId === "basket") router.push("/cart");
   };
 
   if (loading) return <div className="p-12">Loading...</div>;
 
+  const activeDeliveryCountry =
+    selectedAddress?.country ||
+    addresses.find((a) => a._id === selectedAddressId)?.country ||
+    form.country;
+
+  const isInternational = activeDeliveryCountry !== "United Kingdom";
+
+  const canProceedToPayment = isLogin;
+  const PAYMENT_METHODS = [
+    { id: "stripe", label: "Credit / Debit card", icon: <FaRegCreditCard className="text-xl text-gray-700" /> },
+    { id: "paypal", label: "PayPal", icon: <FaPaypal className="text-xl text-[#003087]" /> },
+    { id: "cod", label: "Cash on Delivery", icon: <FaMoneyBillWave className="text-xl text-green-600" /> },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-serif font-bold mb-2">Checkout</h1>
+    <div className="min-h-screen bg-white text-black">
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* TOP CHROME */}
+        <div className="flex items-center justify-between text-sm mb-5">
+          <Link href="/cart" className="text-[#FF6A00] hover:underline">
+            &lt; Back to shopping
+          </Link>
+          <Link href="/" className="text-[#FF6A00] hover:underline">
+            Help
+          </Link>
+        </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* LEFT — CART */}
-          <div className="flex-1 space-y-4">
-            {items.map((item) => (
-              <CheckoutItemCard item={item} key={item.book._id} />
-            ))}
-          </div>
+        {/* STEP BAR */}
+        <CheckoutSteps current={phase} onStepClick={handleStepClick} />
 
-          {/* RIGHT PANEL */}
-          <div className="w-full lg:w-[380px] space-y-5">
-            {/* ADDRESS SELECTOR */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
+        <div className="flex flex-col lg:flex-row gap-6 mt-6">
+          {/* MAIN COLUMN */}
+          <div className="flex-1">
+            {phase === "delivery" ? (
+              /* ============ DELIVERY ============ */
+              <div className="border border-gray-200 p-6 space-y-5">
+                {isLogin ? (
+                  /* ============ LOGGED IN: ADDRESS SELECTION ============ */
+                  <div className="space-y-4">
+                    <h2 className="font-semibold text-lg">Delivery address</h2>
 
-              <div className="space-y-3">
-                {addresses.map((addr) => (
-                  <label
-                    key={addr._id}
-                    className={`block border rounded-lg p-3 cursor-pointer
-                      ${
-                        selectedAddress?._id === addr._id
-                          ? "border-[#FF6A00] bg-[#ff6a0022]"
-                          : ""
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name="address"
-                      checked={selectedAddress?._id === addr._id}
-                      onChange={() => setSelectedAddress(addr)}
-                      className="mr-2 accent-[#FF6A00] bg-white"
-                    />
+                    {addressesLoading ? (
+                      <p className="text-sm text-gray-500">Loading addresses...</p>
+                    ) : (
+                      <div className="divide-y divide-gray-200 border border-gray-200">
+                        {addresses.map((addr) => (
+                          <label
+                            key={addr._id}
+                            className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50"
+                          >
+                            <RadioDot
+                              name="deliveryAddress"
+                              checked={selectedAddressId === addr._id}
+                              onChange={() => {
+                                setSelectedAddressId(addr._id);
+                                setShowAddAddress(false);
+                              }}
+                            />
+                            <div className="flex-1 text-sm">
+                              <div className="font-medium">
+                                {addr.label}
+                                {addr.isDefault && (
+                                  <span className="ml-2 text-xs bg-[#FF6A00] text-white px-2 py-0.5">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-gray-700 mt-0.5">{addr.name}</div>
+                              <div className="text-gray-600">
+                                {addr.line1}
+                                {addr.line2 ? `, ${addr.line2}` : ""}
+                                <br />
+                                {addr.city}, {addr.state} {addr.postalCode}
+                                <br />
+                                {addr.country}
+                                {addr.phone && (
+                                  <>
+                                    <br />
+                                    {addr.phone}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
 
-                    <div className="text-sm">
-                      <div className="font-medium">{addr.name}</div>
-                      <div>
-                        {addr.line1} {addr.city}
+                        <label className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedAddressId("new");
+                          setShowAddAddress(true);
+                        }}
+                        >
+                          <span className="text-sm font-medium text-[#FF6A00]"
+                          >
+                            {addresses.length === 0
+                              ? "Add delivery address"
+                              : "Add a new delivery address"}
+                          </span>
+                        </label>
                       </div>
-                      <div>
-                        {addr.postalCode} {addr.country}
+                    )}
+
+                    {showAddAddress && user?._id && (
+                      <AddAddressForm
+                        userId={user._id}
+                        onSuccess={() => {
+                          dispatch(fetchAddresses(user._id)).then((result) => {
+                            const list = result.payload || [];
+                            const newest =
+                              list.find((a) => a.isDefault) || list[0];
+                            if (newest) {
+                              setSelectedAddressId(newest._id);
+                              setShowAddAddress(false);
+                            }
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {/* ============ GUEST: ACCOUNT QUESTION ============ */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 border-b border-gray-200">
+                      <span className="font-medium sm:w-48">
+                        Do you have an account?
+                      </span>
+                      <div className="flex items-center gap-6">
+                        {["yes", "no"].map((opt) => (
+                          <label
+                            key={opt}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <input
+                              type="radio"
+                              name="hasAccount"
+                              checked={form.hasAccount === opt}
+                              onChange={() => setField("hasAccount", opt)}
+                              className="accent-[#FF6A00]"
+                            />
+                            <span className="capitalize">{opt}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                  </label>
-                ))}
 
-                {/* Toggle Add Form */}
-                <button
-                  onClick={() => {
-                    router.push("/address");
-                  }}
-                  className="text-[#FF6A00] cursor-pointer font-medium text-sm"
-                >
-                  + Add New Address
-                </button>
+                    {form.hasAccount === "yes" && (
+                      <CheckoutLoginForm
+                        email={loginEmail}
+                        password={loginPassword}
+                        showPassword={showPassword}
+                        loading={loginLoading}
+                        error={loginError}
+                        onEmailChange={setLoginEmail}
+                        onPasswordChange={setLoginPassword}
+                        onTogglePassword={() => setShowPassword((v) => !v)}
+                        onSubmit={handleCheckoutLogin}
+                      />
+                    )}
 
-                {showAddForm && (
-                  <AddAddressForm
-                    userId={user._id}
-                    onSuccess={() => {
-                      dispatch(fetchAddresses(user._id));
-                      setShowAddForm(false);
-                    }}
-                  />
+                    {form.hasAccount === "no" && (
+                      <>
+                        <div className="bg-orange-50 border border-orange-100 p-4 text-sm text-gray-700">
+                          <p className="mb-3">
+                            Creating an account lets you check out faster, save
+                            multiple addresses, and track your orders.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push("/auth/user/register")
+                            }
+                            className="bg-[#FF6A00] text-white px-6 py-2 font-semibold hover:bg-[#e86406] cursor-pointer"
+                          >
+                            CREATE AN ACCOUNT
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
-              </div>
-            </div>
 
-            {/* TOTAL */}
-            <div className="bg-white rounded-lg shadow py-6 px-5">
-              <div className="flex justify-between mb-2">
-                <span>Subtotal</span>
-                <span>£{subtotal.toFixed(2)}</span>
-              </div>
-
-              <div className="flex justify-between mb-4">
-                <span>Delivery</span>
-                <span>{shippingCost === 0 ? "FREE" : `£${shippingCost}`}</span>
-              </div>
-
-              <hr />
-
-              <div className="flex justify-between font-bold text-lg mt-4">
-                <span>Total</span>
-                <span>£{total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* PAYMENT */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
-
-              <button
-                onClick={handleCOD}
-                disabled={!selectedAddress || placing}
-                className={`w-full cursor-pointer py-3 rounded-lg text-white
-                  ${
-                    selectedAddress
-                      ? "bg-[#FF6A00] hover:bg-[#e86406]"
-                      : "bg-gray-300"
-                  }`}
-              >
-                {placing ? "Placing Order..." : "Pay with COD"}
-              </button>
-
-            {/* <div className="mt-4">
-              <PayPalButton amount={total.toFixed(2)} userId={user?._id} cart={items} selectedAddress={selectedAddress} />
-            </div> */}
-
-            <div className="max-w-xl mx-auto mt-10">
-              <PaymentMethodSelector onSelect={handlePaymentSelect} />
-
-              {/* PayPal Button Show Only When Selected */}
-              {method === "paypal" && (
-                <div className="mt-6">
-                  <PayPalButton
-                    amount={total.toFixed(2)}
-                    userId={user?._id}
-                    cart={items}
-                    selectedAddress={selectedAddress}
-                  />
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={goToPayment}
+                    disabled={!canProceedToPayment}
+                    className={`px-8 py-3 font-semibold text-white ${
+                      canProceedToPayment
+                        ? "bg-[#FF6A00] hover:bg-[#e86406] cursor-pointer"
+                        : "bg-gray-300 cursor-not-allowed"
+                    }`}
+                  >
+                    NEXT: PAYMENT
+                  </button>
                 </div>
-              )}
+              </div>
+            ) : (
+              /* ============ PAYMENT ============ */
+              <div className="space-y-4">
 
-              {/* Stripe Button Show Only When Selected */}
-              {method === "stripe" && (
-                <div className="mt-6">
-                  <StripeButton
-                    amount={total.toFixed(2)}
-                    userId={user?._id}
-                    cart={items}
-                    selectedAddress={selectedAddress}
-                  />
+                <div className="border border-gray-200 p-6">
+                  <h2 className="text-lg font-semibold mb-4">
+                    Choose your payment method:
+                  </h2>
+
+                  <div className="divide-y divide-gray-200 border border-gray-200">
+                    {PAYMENT_METHODS.map((m) => (
+                      <label
+                        key={m.id}
+                        className="flex items-center gap-3 p-4 cursor-pointer"
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center
+                            ${method === m.id ? "border-[#FF6A00]" : "border-gray-400"}`}
+                        >
+                          {method === m.id && (
+                            <span className="w-2 h-2 rounded-full bg-[#FF6A00]" />
+                          )}
+                        </span>
+                        <input
+                          type="radio"
+                          name="payment"
+                          className="hidden"
+                          checked={method === m.id}
+                          onChange={() => setMethod(m.id)}
+                        />
+                        <span className="flex-1 text-[#FF6A00]">{m.label}</span>
+                        {m.icon}
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* ACTION AREA */}
+                  <div className="mt-6">
+                    {method === "cod" ? (
+                      <button
+                        onClick={handleCOD}
+                        disabled={placing}
+                        className="w-full py-3 bg-[#FF6A00] hover:bg-[#e86406] text-white font-semibold cursor-pointer disabled:bg-gray-400"
+                      >
+                        {placing ? "Placing Order..." : "PLACE ORDER"}
+                      </button>
+                    ) : method === "stripe" ? (
+                      <StripeButton
+                        amount={total.toFixed(2)}
+                        userId={user?._id}
+                        cart={items}
+                        selectedAddress={selectedAddress}
+                      />
+                    ) : (
+                      <PayPalButton
+                        amount={total.toFixed(2)}
+                        userId={user?._id}
+                        cart={items}
+                        selectedAddress={selectedAddress}
+                      />
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-            </div>
+              </div>
+            )}
           </div>
+
+          {/* SIDEBAR */}
+          <OrderSidebar
+            step={phase}
+            itemCount={itemCount}
+            subtotal={subtotal}
+            deliveryCost={shippingCost}
+            deliveryLabel={isInternational ? "International courier" : "Delivery"}
+            total={total}
+            deliverTo={selectedAddress}
+          />
         </div>
       </div>
     </div>
   );
 };
+
+const inputCls =
+  "w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#FF6A00]";
+
+function RadioDot({ checked, onChange, name }) {
+  return (
+    <>
+      <span
+        className={`w-4 h-4 mt-0.5 rounded-full border flex-shrink-0 flex items-center justify-center
+          ${checked ? "border-[#FF6A00]" : "border-gray-400"}`}
+      >
+        {checked && <span className="w-2 h-2 rounded-full bg-[#FF6A00]" />}
+      </span>
+      <input
+        type="radio"
+        name={name}
+        className="hidden"
+        checked={checked}
+        onChange={onChange}
+      />
+    </>
+  );
+}
+
+function CheckoutLoginForm({
+  email,
+  password,
+  showPassword,
+  loading,
+  error,
+  onEmailChange,
+  onPasswordChange,
+  onTogglePassword,
+  onSubmit,
+}) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 pt-2">
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2">
+          {error}
+        </p>
+      )}
+
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => onEmailChange(e.target.value)}
+        placeholder="Please type your email address"
+        className={inputCls}
+        required
+      />
+
+      <Link
+        href="/auth/user/forgot-password"
+        className="text-sm text-[#FF6A00] underline inline-block"
+      >
+        Forgot password
+      </Link>
+
+      <div className="relative">
+        <input
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          placeholder="Please type your password"
+          className={`${inputCls} pr-10`}
+          required
+        />
+        <button
+          type="button"
+          onClick={onTogglePassword}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+        </button>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-8 py-2.5 font-semibold text-white bg-[#FF6A00] hover:bg-[#e86406] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? "SIGNING IN..." : "SIGN IN"}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default Page;

@@ -3,29 +3,91 @@
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faTrash,
-  faMinus,
-  faPlus,
-  faArrowLeft,
-} from "@fortawesome/free-solid-svg-icons";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchCart,
   updateCartQuantity,
   removeFromCart,
 } from "@/store/cartSlice";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import reverseName from "@/lib/reverseName";
 import { useRouter } from "next/navigation";
 import { fetchUserDetails } from "@/store/userSlice";
+import CheckoutSteps from "@/components/checkout/CheckoutSteps";
+import OrderSidebar from "@/components/checkout/OrderSidebar";
+
+
+function CartQuantitySelector({ quantity, onUpdate }) {
+  const [showCustom, setShowCustom] = useState(quantity > 10);
+  const [draft, setDraft] = useState(
+    quantity > 10 ? String(quantity) : ""
+  );
+
+  useEffect(() => {
+    if (quantity > 10) {
+      setShowCustom(true);
+      setDraft(String(quantity));
+    }
+  }, [quantity]);
+
+  const commitCustomQty = () => {
+    const qty = parseInt(draft, 10);
+    if (!qty || qty <= 10) {
+      setShowCustom(false);
+      setDraft("");
+      if (qty >= 1 && qty <= 10) onUpdate(qty);
+      return;
+    }
+    setDraft(String(qty));
+    onUpdate(qty);
+  };
+
+  if (showCustom) {
+    return (
+      <input
+        type="number"
+        min={11}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitCustomQty}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        placeholder="Qty"
+        autoFocus
+        className="border border-gray-300 px-2 py-1 text-sm w-16 focus:outline-none focus:border-[#FF6A00]"
+      />
+    );
+  }
+
+  return (
+    <select
+      value={quantity <= 10 ? quantity : "10+"}
+      onChange={(e) => {
+        if (e.target.value === "10+") {
+          setShowCustom(true);
+          setDraft("");
+        } else {
+          onUpdate(Number(e.target.value));
+        }
+      }}
+      className="border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:border-[#FF6A00] cursor-pointer"
+    >
+      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+        <option key={n} value={n}>
+          {n}
+        </option>
+      ))}
+      <option value="10+">10+</option>
+    </select>
+  );
+}
 
 export default function CartPage() {
   const dispatch = useDispatch();
   const { items = [] } = useSelector((state) => state.cart);
-  const { user, isLogin } = useSelector((state) => state.user);
   const router = useRouter();
+  const [imgError, setImgError] = useState(false);
   useEffect(() => {
     dispatch(fetchCart());
     dispatch(fetchUserDetails());
@@ -57,193 +119,164 @@ export default function CartPage() {
     return sum + getFinalPrice(item.book) * item.quantity;
   }, 0);
 
+  const itemCount = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
   const shippingCost = subtotal > 25 ? 0 : 2.99;
   const total = subtotal + shippingCost;
 
-  const handleCheckout = () => {
-    if (!isLogin) {
-      router.push("/auth/user/login");
-    } else {
-      router.push("/checkout");
-    }
-    // console.log("Checkout");
+  const handleNext = () => {
+    router.push("/checkout");
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black">
-      {/* BREADCRUMB */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 text-sm">
+    <div className="min-h-screen bg-white text-black">
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* TOP CHROME */}
+        <div className="flex items-center justify-between text-sm mb-5">
           <Link href="/" className="text-[#FF6A00] hover:underline">
-            Home
-          </Link>{" "}
-          / <span className="font-medium">Shopping Basket</span>
+            &lt; Back to shopping
+          </Link>
+          <Link href="/" className="text-[#FF6A00] hover:underline">
+            Help
+          </Link>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-serif font-bold mb-2">Shopping Basket</h1>
-
-        <p className="text-gray-600 mb-8">
-          You have <b>{items.length}</b> item(s) in your basket
-        </p>
+        {/* STEP BAR */}
+        <CheckoutSteps current="basket" />
 
         {items.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded">
+          <div className="bg-white p-12 text-center border border-gray-200 mt-6">
             <h2 className="text-2xl font-bold mb-4">Your basket is empty</h2>
             <Link
               href="/"
-              className="bg-[#FF6A00] text-white px-6 py-3 rounded-lg inline-block"
+              className="bg-[#FF6A00] text-white px-6 py-3 inline-block hover:bg-[#e86406]"
             >
               Continue Shopping
             </Link>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* CART ITEMS */}
-            <div className="lg:col-span-2 bg-white rounded">
-              {items.map((item) => {
-                const book = item.book;
-                if (!book) return null;
+          <div className="flex flex-col lg:flex-row gap-6 mt-6">
+            {/* ITEMS */}
+            <div className="flex-1">
+              <div className="border border-gray-200">
+                {items.map((item) => {
+                  const book = item.book;
+                  if (!book) return null;
 
-                const title = getTitle(book);
-                const price = getFinalPrice(book);
-                const author = getAuthor(book);
+                  const title = getTitle(book);
+                  const author = getAuthor(book);
+                  const original = getOriginalPrice(book);
+                  const price = getFinalPrice(book);
+                  const discounted = price < original;
 
-                return (
-                  <div key={book._id} className="p-6 border-b">
-                    <div className="grid sm:grid-cols-4 gap-6">
+                  return (
+                    <div
+                      key={book._id}
+                      className="flex gap-4 p-5 border-b border-gray-200"
+                    >
                       {/* IMAGE */}
-                      <div className="relative h-32 bg-gray-100 flex items-center justify-center">
-                        {book.coverImage || book.recordReference ? (
+                      <div className="relative w-16 h-24 flex-shrink-0 bg-gray-50 flex items-center justify-center">
+                        {book.coverImage || book.recordReference && !imgError ? (
                           <Image
-                            src={book.coverImage || `/covers/${book.recordReference.split("_")[0]}.jpg`}
+                            src={
+                              book.coverImage ||
+                              `/covers/${book.recordReference.split("_")[0]}.jpg`
+                            }
                             alt={title}
                             fill
                             className="object-contain"
+                            sizes="64px"
                             unoptimized={true}
+                            onError={() => setImgError(true)}
                           />
                         ) : (
-                          <span className="text-gray-400 text-[10px] text-center px-2">{title}</span>
+                          <span className="text-gray-400 text-[8px] text-center px-1">
+                            {title}
+                          </span>
                         )}
                       </div>
 
                       {/* INFO */}
-                      <div className="sm:col-span-3 flex justify-between">
-                        <div>
-                          <Link href={`/${book._id}`}>
-                            <h3 className="font-semibold text-lg">{title}</h3>
-                          </Link>
-                          <p className="text-sm text-gray-600">{author}</p>
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/${book._id}`}>
+                          <h3 className="font-semibold leading-snug hover:underline">
+                            {title}
+                          </h3>
+                        </Link>
+                        <div
+                          className="text-sm"
+                        >
+                          {author}
+                        </div>
 
-                          {/* QUANTITY */}
-                          <div className="flex items-center gap-3 mt-3">
-                            <button
-                              className="cursor-pointer"
-                              disabled={item.quantity <= 1}
-                              onClick={() =>
-                                dispatch(
-                                  updateCartQuantity({
-                                    bookId: book._id,
-                                    quantity: item.quantity - 1,
-                                  })
-                                )
-                              }
-                            >
-                              <FontAwesomeIcon icon={faMinus} />
-                            </button>
-
-                            <span className="font-semibold border border-black px-3 rounded-sm">
-                              {item.quantity}
+                        <div className="mt-1 text-sm">
+                          {discounted && (
+                            <span className="text-gray-400 line-through mr-2">
+                              £{original.toFixed(2)}
                             </span>
-
-                            <button
-                              className="cursor-pointer"
-                              onClick={() =>
-                                dispatch(
-                                  updateCartQuantity({
-                                    bookId: book._id,
-                                    quantity: item.quantity + 1,
-                                  })
-                                )
-                              }
-                            >
-                              <FontAwesomeIcon icon={faPlus} />
-                            </button>
-                          </div>
+                          )}
+                          <span className="font-semibold">
+                            £{price.toFixed(2)}
+                          </span>
                         </div>
 
-                        {/* PRICE & REMOVE */}
-                        <div className="text-right ml-8">
-                          <p className="font-bold">
-                            £{(price * item.quantity).toFixed(2)}
-                          </p>
+                        <button
+                          onClick={async () => {
+                            const response = await dispatch(
+                              removeFromCart({ bookId: book._id })
+                            );
+                            if (response?.type === "cart/remove/fulfilled") {
+                              toast.success("Item removed from basket");
+                            }
+                          }}
+                          className="text-[#FF6A00] text-sm underline mt-2 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
 
-                          <button
-                            onClick={async () => {
-                              // return;
-                              const response = await dispatch(
-                                removeFromCart({
-                                  bookId: book._id,
-                                  // ebookFormat: book?.ebookCategories[0],
-                                })
-                              );
+                      {/* QTY + LINE PRICE */}
+                      <div className="flex flex-col items-end gap-3">
+                        <CartQuantitySelector
+                          quantity={item.quantity}
+                          onUpdate={(qty) =>
+                            dispatch(
+                              updateCartQuantity({
+                                bookId: book._id,
+                                quantity: qty,
+                              })
+                            )
+                          }
+                        />
 
-                              if (response?.type === "cart/remove/fulfilled") {
-                                toast.success("Item removed from cart");
-                              }
-
-                              // console.log(
-                              //   "-=-=-= response in the itrem cart delete  -=-=-=",
-                              //   response
-                              // );
-                            }}
-                            className="text-red-600 mt-2 cursor-pointer "
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
-                        </div>
+                        <span className="font-semibold whitespace-nowrap">
+                          £{(price * item.quantity).toFixed(2)}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
-              <Link
-                href="/"
-                className="flex items-center gap-2 p-6 text-[#FF6A00]"
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-                Continue Shopping
-              </Link>
+                {/* NEXT BUTTON */}
+                <div className="flex justify-end p-5 bg-gray-50">
+                  <button
+                    onClick={handleNext}
+                    className="bg-[#FF6A00] text-white px-8 py-3 font-semibold cursor-pointer hover:bg-[#e86406]"
+                  >
+                    NEXT: DELIVERY
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* SUMMARY */}
-            <div className="bg-white p-6 rounded h-fit">
-              <div className="flex justify-between mb-2">
-                <span>Subtotal</span>
-                <span>£{subtotal.toFixed(2)}</span>
-              </div>
-
-              <div className="flex justify-between mb-4">
-                <span>Delivery</span>
-                <span>{shippingCost === 0 ? "FREE" : `£${shippingCost}`}</span>
-              </div>
-
-              <hr />
-
-              <div className="flex justify-between font-bold text-lg mt-4">
-                <span>Total</span>
-                <span>£{total.toFixed(2)}</span>
-              </div>
-
-              <button
-                onClick={handleCheckout}
-                className="w-full cursor-pointer mt-6 bg-[#FF6A00] text-white py-3 rounded"
-              >
-                Proceed to Checkout
-              </button>
-            </div>
+            {/* SIDEBAR */}
+            <OrderSidebar
+              step="basket"
+              itemCount={itemCount}
+              subtotal={subtotal}
+              deliveryCost={shippingCost}
+              deliveryLabel="Delivery"
+              total={total}
+            />
           </div>
         )}
       </div>
