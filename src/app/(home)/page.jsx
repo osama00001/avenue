@@ -1,10 +1,10 @@
 import HomePageClient from "./HomePageClient";
 
 const SEO_TITLE =
-  "Avenue Bookstore | New Releases, Book Deals & Bestsellers Online";
+  "The best deals on books, fiction, nonfiction and children's books at Avenue Bookstore";
 
 const SEO_DESCRIPTION =
-  "Bringing the bookstore to your door we collate every new release, every book deal and every exciting launch from your favourite brick and mortar stores in one welcoming space – Avenue Bookstore. Explore our bookstore and discover new worlds, learn new skills, delve deep into the lives of popular figures and take a glimpse into ancient history. We have the latest bestsellers, chuckle inducing children's books, cultural classics, fantastical fiction and Nobel prize winning nonfiction for you.";
+  "The Avenue Bookstore brings you the best deals on books, stationery and gifts. Fiction, nonfiction and children's books of all genres and ages await. Great deals and free next day delivery on books.";
 
 export const metadata = {
   title: SEO_TITLE,

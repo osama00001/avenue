@@ -15,11 +15,12 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: {
-    default: "Avenue Bookstore | New Releases, Book Deals & Bestsellers Online",
+    default:
+      "The best deals on books, fiction, nonfiction and children's books at Avenue Bookstore",
     template: "%s | Avenue Bookstore",
   },
   description:
-    "Bringing the bookstore to your door we collate every new release, every book deal and every exciting launch from your favourite brick and mortar stores in one welcoming space – Avenue Bookstore.",
+    "The Avenue Bookstore brings you the best deals on books, stationery and gifts. Fiction, nonfiction and children's books of all genres and ages await. Great deals and free next day delivery on books.",
 };
 
 export default function RootLayout({ children }) {
