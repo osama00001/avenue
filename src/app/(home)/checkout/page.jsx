@@ -15,7 +15,7 @@ import {
   faEye,
   faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
-import { FaPaypal, FaRegCreditCard, FaMoneyBillWave } from "react-icons/fa";
+import { FaPaypal, FaRegCreditCard} from "react-icons/fa";
 
 import PayPalButton from "@/components/PayPalButton";
 import StripeButton from "@/components/StripeButton";
@@ -159,41 +159,6 @@ const Page = () => {
     if (selectedOrder?._id) router.push(`/thank-you/${selectedOrder._id}`);
   }, [selectedOrder]);
 
-  // ================= COD =================
-  const handleCOD = async () => {
-    if (!selectedAddress) {
-      toast.error("Please complete your delivery details");
-      return;
-    }
-    if (!items.length) {
-      toast.error("Basket is empty");
-      return;
-    }
-
-    try {
-      const cartPayload = items.map((item) => ({
-        bookId: item.book._id,
-        quantity: item.quantity,
-        ebookFormat: item.ebookFormat || null,
-      }));
-
-      const order = await dispatch(
-        placeCODOrder({
-          userId: user?._id,
-          cart: cartPayload,
-          shippingAddress: selectedAddress,
-        })
-      ).unwrap();
-
-      dispatch(clearCart());
-      toast.success("Order placed successfully!");
-      router.push(`/checkout/thank-you?order=${order._id}`);
-    } catch (err) {
-      console.error(err);
-      toast.error(err?.message || "Something went wrong placing order");
-    }
-  };
-
   const goToPayment = () => {
     if (isLogin) {
       if (selectedAddressId === "new" || showAddAddress) {
@@ -265,7 +230,6 @@ const Page = () => {
   const PAYMENT_METHODS = [
     { id: "stripe", label: "Credit / Debit card", icon: <FaRegCreditCard className="text-xl text-gray-700" /> },
     { id: "paypal", label: "PayPal", icon: <FaPaypal className="text-xl text-[#003087]" /> },
-    { id: "cod", label: "Cash on Delivery", icon: <FaMoneyBillWave className="text-xl text-green-600" /> },
   ];
 
   return (
@@ -487,15 +451,7 @@ const Page = () => {
 
                   {/* ACTION AREA */}
                   <div className="mt-6">
-                    {method === "cod" ? (
-                      <button
-                        onClick={handleCOD}
-                        disabled={placing}
-                        className="w-full py-3 bg-[#1a1a1a] hover:bg-[#262626] text-white font-semibold cursor-pointer disabled:bg-gray-400"
-                      >
-                        {placing ? "Placing Order..." : "PLACE ORDER"}
-                      </button>
-                    ) : method === "stripe" ? (
+                    {method === "stripe" ? (
                       <StripeButton
                         amount={total.toFixed(2)}
                         userId={user?._id}

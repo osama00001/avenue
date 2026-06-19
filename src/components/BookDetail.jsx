@@ -146,8 +146,8 @@ export default function BookDetail({ book }) {
             {book?.isSellable &&
               book?.availabilityStatus === "preorder" && (
                 <button
-                  disabled
-                  className="w-full border rounded-md bg-gray-100 text-black px-6 py-3 font-semibold"
+                  onClick={addToBasket}
+                  className="w-full border cursor-pointer bg-black hover:bg-[#FF6A00] text-white px-6 py-3 font-semibold"
                 >
                   Pre Order
                 </button>
