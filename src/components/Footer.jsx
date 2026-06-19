@@ -217,9 +217,15 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* COPYRIGHT */}
-      <div className="border-t border-neutral-700 text-xs text-gray-400 px-6 py-4 text-center">
-        © AVENUE, 2026.
+      {/* Legal / company info */}
+      <div className="border-t border-neutral-700 px-6 py-5">
+        <div className="max-w-7xl mx-auto text-center text-xs text-gray-400 leading-relaxed space-y-1">
+          <p className="font-medium text-gray-300">© Avenue, 2026.</p>
+          <p>
+            Avenue Retail Online Limited. Registered in England and Wales. Company
+            Number 16339200. Registered Office 128 City Road London EC1V 2NX
+          </p>
+        </div>
       </div>
     </footer>
   );

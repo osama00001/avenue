@@ -1,144 +1,179 @@
+import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
 import User from "@/models/User";
-import Book from "@/models/Book";
-import { NextResponse } from "next/server";
-import Category from "@/models/Category";
+import { requireAdminApi } from "@/lib/requireAdminApi";
 
-export async function GET() {
+const CUSTOMER_FILTER = { role: "user", isDeleted: false };
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function buildDayBuckets(days) {
+  const buckets = [];
+  const today = startOfDay(new Date());
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const key = date.toISOString().slice(0, 10);
+    buckets.push({
+      date: key,
+      label: date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),
+      orders: 0,
+      revenue: 0,
+    });
+  }
+
+  return buckets;
+}
+
+/**
+ * GET /api/admin/dashboard?days=7
+ */
+export async function GET(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
-    // =============================
-    // BASIC COUNTS
-    // =============================
+    const { searchParams } = new URL(req.url);
+    const days = Math.min(Math.max(Number(searchParams.get("days")) || 7, 1), 365);
 
-    const [totalUsers, totalBooks, totalCategories, totalOrders] =
-      await Promise.all([
-        User.countDocuments(),
-        Book.countDocuments(),
-        Category.countDocuments(),
-        Order.countDocuments(),
-      ]);
+    const rangeStart = startOfDay(new Date());
+    rangeStart.setDate(rangeStart.getDate() - (days - 1));
 
-    // =============================
-    // REVENUE
-    // =============================
+    const monthStart = startOfDay(new Date());
+    monthStart.setDate(1);
 
-    const revenueAgg = await Order.aggregate([
-      { $match: { status: { $ne: "cancelled" } } },
-      {
-        $group: {
-          _id: null,
-          revenue: { $sum: "$total" },
+    const [
+      totalCustomers,
+      totalOrders,
+      paidRevenueAgg,
+      monthRevenueAgg,
+      recentOrders,
+      recentUsers,
+      dailyAgg,
+    ] = await Promise.all([
+      User.countDocuments(CUSTOMER_FILTER),
+      Order.countDocuments({}),
+      Order.aggregate([
+        { $match: { "payment.status": "paid" } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$total", 0] } } } },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: monthStart },
+            "payment.status": "paid",
+          },
         },
-      },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$total", 0] } } } },
+      ]),
+      Order.find({})
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .select(
+          "orderNumber user createdAt updatedAt payment total status"
+        )
+        .lean(),
+      User.find(CUSTOMER_FILTER)
+        .sort({ createdAt: -1 })
+        .limit(7)
+        .select("firstName lastName email createdAt")
+        .lean(),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: rangeStart } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+            },
+            orders: { $sum: 1 },
+            revenue: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$payment.status", "paid"] },
+                  { $ifNull: ["$total", 0] },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
     ]);
 
-    const totalRevenue = revenueAgg[0]?.revenue || 0;
+    const emails = recentUsers.map((u) => u.email).filter(Boolean);
+    const customerOrderStats = emails.length
+      ? await Order.aggregate([
+          { $match: { "user.email": { $in: emails } } },
+          {
+            $group: {
+              _id: "$user.email",
+              orderCount: { $sum: 1 },
+              spent: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$payment.status", "paid"] },
+                    { $ifNull: ["$total", 0] },
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+      : [];
 
-    // =============================
-    // TODAY STATS
-    // =============================
+    const statsByEmail = Object.fromEntries(
+      customerOrderStats.map((row) => [row._id, row])
+    );
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const todayOrders = await Order.countDocuments({
-      createdAt: { $gte: startOfDay },
+    const dailyMap = Object.fromEntries(dailyAgg.map((row) => [row._id, row]));
+    const chart = buildDayBuckets(days).map((bucket) => {
+      const row = dailyMap[bucket.date];
+      return {
+        name: bucket.label,
+        orders: row?.orders || 0,
+        revenue: Math.round((row?.revenue || 0) * 100) / 100,
+      };
     });
 
-    const todayRevenueAgg = await Order.aggregate([
-      { $match: { createdAt: { $gte: startOfDay } } },
-      { $group: { _id: null, revenue: { $sum: "$total" } } },
-    ]);
-
-    const todayRevenue = todayRevenueAgg[0]?.revenue || 0;
-
-    // =============================
-    // ORDER STATUS BREAKDOWN
-    // =============================
-
-    const statusStats = await Order.aggregate([
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    // =============================
-    // REVENUE LAST 7 DAYS
-    // =============================
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-
-    const revenue7Days = await Order.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
-          },
-          revenue: { $sum: "$total" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // =============================
-    // TOP SELLING BOOKS
-    // =============================
-
-    const topBooks = await Order.aggregate([
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.book",
-          qty: { $sum: "$items.quantity" },
-        },
-      },
-      { $sort: { qty: -1 } },
-      { $limit: 5 },
-      {
-        $lookup: {
-          from: "books",
-          localField: "_id",
-          foreignField: "_id",
-          as: "book",
-        },
-      },
-      { $unwind: "$book" },
-      {
-        $project: {
-          title: "$book.descriptiveDetail.titles.text",
-          qty: 1,
-        },
-      },
-    ]);
+    const newCustomers = recentUsers.map((user) => {
+      const stats = statsByEmail[user.email] || { orderCount: 0, spent: 0 };
+      return {
+        id: user._id.toString(),
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
+        email: user.email,
+        createdAt: user.createdAt,
+        orderCount: stats.orderCount || 0,
+        spent: stats.spent || 0,
+      };
+    });
 
     return NextResponse.json({
-      totals: {
-        users: totalUsers,
-        books: totalBooks,
-        categories: totalCategories,
-        orders: totalOrders,
-        revenue: totalRevenue,
+      summary: {
+        totalRevenue: paidRevenueAgg[0]?.total || 0,
+        monthRevenue: monthRevenueAgg[0]?.total || 0,
+        totalOrders,
+        totalCustomers,
       },
-
-      today: {
-        orders: todayOrders,
-        revenue: todayRevenue,
-      },
-
-      statusStats,
-      revenue7Days,
-      topBooks,
+      chart,
+      newCustomers,
+      recentOrders,
+      days,
     });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: true }, { status: 500 });
+    console.error("Admin Dashboard Error:", err);
+    return NextResponse.json(
+      { error: "Failed to load dashboard data" },
+      { status: 500 }
+    );
   }
 }
