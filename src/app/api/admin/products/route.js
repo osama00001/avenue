@@ -2,18 +2,21 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import Book from "@/models/Book";
+import { requireAdminApi } from "@/lib/requireAdminApi";
+import {
+  getAdminBookListTotal,
+  queryAdminBookList,
+} from "@/lib/adminBookList";
 
 /**
- * ======================================
- * GET /api/admin/book
- * Query params:
- * - page (default 1)
- * - limit (default 50, max 50)
- * - search (optional: title / recordReference)
- * ======================================
+ * GET /api/admin/products
+ * Query: page, limit, search
  */
 export async function GET(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -26,32 +29,40 @@ export async function GET(req) {
 
     const filter = {};
 
-    // 🔍 Search by title or recordReference
     if (search) {
-      filter.$or = [
-        { "descriptiveDetail.titles.text": { $regex: search, $options: "i" } },
-        { recordReference: { $regex: search, $options: "i" } },
-      ];
+      const term = search.trim();
+      if (term.length >= 2) {
+        filter.$or = [
+          { "descriptiveDetail.titles.text": { $regex: term, $options: "i" } },
+          { recordReference: { $regex: term, $options: "i" } },
+          { "productIdentifiers.value": { $regex: term, $options: "i" } },
+        ];
+      }
     }
 
-    const [books, total] = await Promise.all([
-      Book.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
-
-      Book.countDocuments(filter),
+    const [listResult, totalResult] = await Promise.all([
+      queryAdminBookList(filter, { skip, limit }),
+      getAdminBookListTotal(filter),
     ]);
+
+    const { books, hasMore } = listResult;
+    const { total, isEstimated } = totalResult;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
 
     return NextResponse.json(
       {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages,
+        isEstimated,
+        hasMore: hasMore || page < totalPages,
         data: books,
       },
       { status: 200 }
     );
   } catch (err) {
-    console.error("❌ ADMIN BOOK GET ERROR:", err);
+    console.error("ADMIN BOOK GET ERROR:", err);
     return NextResponse.json(
       { error: "Failed to fetch books" },
       { status: 500 }
@@ -59,18 +70,11 @@ export async function GET(req) {
   }
 }
 
-/**
- * ======================================
- * PUT /api/admin/book
- * Body:
- * {
- *   id: string,
- *   data: { ...partialBookFields }
- * }
- * ======================================
- */
 export async function PUT(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
     const { id, data } = await req.json();
@@ -101,7 +105,7 @@ export async function PUT(req) {
 
     return NextResponse.json(updatedBook, { status: 200 });
   } catch (err) {
-    console.error("❌ ADMIN BOOK UPDATE ERROR:", err);
+    console.error("ADMIN BOOK UPDATE ERROR:", err);
     return NextResponse.json(
       { error: "Failed to update book" },
       { status: 500 }
@@ -109,17 +113,11 @@ export async function PUT(req) {
   }
 }
 
-/**
- * ======================================
- * DELETE /api/admin/book
- * Body:
- * {
- *   id: string
- * }
- * ======================================
- */
 export async function DELETE(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
     const { id } = await req.json();
@@ -142,7 +140,7 @@ export async function DELETE(req) {
       { status: 200 }
     );
   } catch (err) {
-    console.error("❌ ADMIN BOOK DELETE ERROR:", err);
+    console.error("ADMIN BOOK DELETE ERROR:", err);
     return NextResponse.json(
       { error: "Failed to delete book" },
       { status: 500 }

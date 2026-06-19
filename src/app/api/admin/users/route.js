@@ -1,34 +1,39 @@
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import { NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/requireAdminApi";
 
 export async function GET(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);
 
     const page = parseInt(searchParams.get("page")) || 1;
-    const limit = parseInt(searchParams.get("limit")) || 50;
+    const limit = Math.min(parseInt(searchParams.get("limit")) || 50, 50);
     const search = searchParams.get("search") || "";
 
     const skip = (page - 1) * limit;
 
-    // ---------- Search Filter ----------
+    const baseFilter = { role: "user", isDeleted: false };
+
     const filter = search
       ? {
+          ...baseFilter,
           $or: [
             { email: { $regex: search, $options: "i" } },
             { firstName: { $regex: search, $options: "i" } },
             { lastName: { $regex: search, $options: "i" } },
           ],
         }
-      : {};
+      : baseFilter;
 
-    // ---------- Query ----------
     const [users, total] = await Promise.all([
       User.find(filter)
-        .select("-password -resetToken -resetTokenExpiry") // CRITICAL
+        .select("-password -resetToken -resetTokenExpiry")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

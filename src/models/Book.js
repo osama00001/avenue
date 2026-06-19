@@ -37,6 +37,7 @@ const bookSchema = new Schema({
   },
 
   coverImage: { type: String, index: true },
+  recordReference: { type: String, index: true },
   isSellable: { type: Boolean, default: true, index: true },
   availabilityStatus: { type: String, index: true },
 
@@ -59,5 +60,8 @@ bookSchema.index({ isSellable: 1, bicSubjectPrefixes: 1, coverImage: -1, created
 
 // 3. Product-form filtering (paperback / hardback)
 bookSchema.index({ "descriptiveDetail.productForm": 1, isSellable: -1, coverImage: -1 });
+
+// 4. Admin product list — newest first (1.9M+ collection)
+bookSchema.index({ createdAt: -1 });
 
 export default mongoose.models.Book || mongoose.model('Book', bookSchema);

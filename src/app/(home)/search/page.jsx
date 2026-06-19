@@ -1,7 +1,7 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -15,9 +15,12 @@ import reverseName from "@/lib/reverseName";
 import afterDiscountPrice from "@/lib/afterDiscountPrice";
 import { addToCart, fetchCart } from "@/store/cartSlice";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { fetchBooksForHome, setReduxSearchText } from "@/store/bookSlice";
 
-function SearchPage() {
+function SearchPageClient() {
   const dispatch = useDispatch();
+  const searchParams = useSearchParams();
   const { searchResults, searchText, loading } = useSelector(
     (state) => state.book
   );
@@ -27,11 +30,16 @@ function SearchPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    const fetchingCart = async () => {
-      dispatch(fetchCart());
-    };
-    fetchingCart();
+    dispatch(fetchCart());
   }, [dispatch]);
+
+  useEffect(() => {
+    const q = (searchParams.get("q") || "").trim();
+    if (!q) return;
+    dispatch(setReduxSearchText(q));
+    dispatch(fetchBooksForHome({ search: q, limit: 50, page: 1 }));
+    setCurrentPage(1);
+  }, [searchParams, dispatch]);
 
   const itemsPerPage = 12;
 
@@ -512,4 +520,21 @@ function SearchPage() {
   );
 }
 
-export default SearchPage;
+function SearchPageFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6A00] mx-auto mb-4"></div>
+        <p className="text-gray-600 font-medium">Loading search...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchPageFallback />}>
+      <SearchPageClient />
+    </Suspense>
+  );
+}

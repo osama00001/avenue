@@ -24,6 +24,7 @@ export const revalidate = 0;
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT     = 100;
+const SEARCH_LIMIT  = 50;
 
 const RANDOMISED_SECTIONS = new Set([
   "bestsellers",
@@ -105,26 +106,34 @@ export async function GET(req) {
     const category = searchParams.get("category");
     const search   = searchParams.get("search")?.trim();
     const sort     = searchParams.get("sort");
-    const limit    = Math.min(Number(searchParams.get("limit")) || DEFAULT_LIMIT, MAX_LIMIT);
+    const limit    = search
+      ? Math.min(Number(searchParams.get("limit")) || SEARCH_LIMIT, MAX_LIMIT)
+      : Math.min(Number(searchParams.get("limit")) || DEFAULT_LIMIT, MAX_LIMIT);
     const page     = Math.max(Number(searchParams.get("page")) || 1, 1);
     const skip     = (page - 1) * limit;
 
     const baseFilter = {};
 
-    // ── SEARCH ───────────────────────────────────────────────────────────
+    // ── SEARCH ──────────────────────────────────────────────────────────
     if (search) {
-      const or = [];
       if (mongoose.Types.ObjectId.isValid(search)) {
-        or.push({ _id: new mongoose.Types.ObjectId(search) });
+        const byId = await Book.findById(search).lean();
+        return NextResponse.json(byId ? [byId] : []);
       }
-      or.push({ "productIdentifiers.value": search });
-      or.push({ recordReference: search });
-      or.push({ "descriptiveDetail.titles.text": { $regex: search, $options: "i" } });
-      or.push({ "descriptiveDetail.contributors.nameInverted": { $regex: search, $options: "i" } });
 
-      const books = await Book.find({ ...baseFilter, $or: or })
+      const books = await Book.find({
+        ...baseFilter,
+        $or: [
+          { "descriptiveDetail.titles.text": { $regex: escRegex(search), $options: "i" } },
+          { recordReference: { $regex: escRegex(search), $options: "i" } },
+          { "productIdentifiers.value": { $regex: escRegex(search), $options: "i" } },
+        ],
+      })
         .sort(buildSort(sort))
-        .skip(skip).limit(limit).lean();
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
       return NextResponse.json(books);
     }
 

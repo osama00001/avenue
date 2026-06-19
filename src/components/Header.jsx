@@ -129,9 +129,10 @@ export default function Header() {
   };
 
   const handleSearch = () => {
-    dispatch(fetchBooksForHome({ search: searchText }));
-    dispatch(setReduxSearchText(searchText));
-    router.push("/search");
+    const q = searchText.trim();
+    if (!q) return;
+    dispatch(setReduxSearchText(q));
+    router.push(`/search?q=${encodeURIComponent(q)}`);
   };
 
   const level1Categories = (categories || []).filter((cat) => cat.level === 1);

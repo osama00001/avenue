@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Order from "@/models/Order";
+import { requireAdminApi } from "@/lib/requireAdminApi";
 
 /**
- * =========================================================
- * GET — ADMIN FETCH ORDERS
- * /api/admin/orders?page=1&limit=50&search=&status=
- * =========================================================
+ * GET /api/admin/orders?page=1&limit=50&search=&status=&completed=true
  */
 export async function GET(req) {
   try {
+    const auth = await requireAdminApi(req);
+    if (!auth.authorized) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -19,13 +20,16 @@ export async function GET(req) {
 
     const search = searchParams.get("search");
     const status = searchParams.get("status");
+    const completed = searchParams.get("completed") === "true";
 
     const skip = (page - 1) * limit;
 
-    // ---------------- FILTER BUILD ----------------
     const query = {};
 
-    if (status) {
+    if (completed) {
+      query.status = "delivered";
+      query["payment.status"] = "paid";
+    } else if (status) {
       query.status = status;
     }
 
@@ -36,7 +40,6 @@ export async function GET(req) {
       ];
     }
 
-    // ---------------- FETCH ----------------
     const [orders, total] = await Promise.all([
       Order.find(query)
         .sort({ createdAt: -1 })
@@ -54,7 +57,6 @@ export async function GET(req) {
       totalPages: Math.ceil(total / limit),
       data: orders,
     });
-
   } catch (err) {
     console.error("Admin Orders Error:", err);
     return NextResponse.json(
