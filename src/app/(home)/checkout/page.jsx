@@ -229,7 +229,7 @@ const Page = () => {
   const canProceedToPayment = isLogin;
   const PAYMENT_METHODS = [
     { id: "stripe", label: "Credit / Debit card", icon: <FaRegCreditCard className="text-xl text-gray-700" /> },
-    { id: "paypal", label: "PayPal", icon: <FaPaypal className="text-xl text-[#003087]" /> },
+    // { id: "paypal", label: "PayPal", icon: <FaPaypal className="text-xl text-[#003087]" /> },
   ];
 
   return (
@@ -451,21 +451,21 @@ const Page = () => {
 
                   {/* ACTION AREA */}
                   <div className="mt-6">
-                    {method === "stripe" ? (
+                    {/* {method === "stripe" ? ( */}
                       <StripeButton
                         amount={total.toFixed(2)}
                         userId={user?._id}
                         cart={items}
                         selectedAddress={selectedAddress}
                       />
-                    ) : (
-                      <PayPalButton
-                        amount={total.toFixed(2)}
-                        userId={user?._id}
-                        cart={items}
-                        selectedAddress={selectedAddress}
-                      />
-                    )}
+                    {/* ) : ( */}
+                    {/* //   <PayPalButton
+                    //     amount={total.toFixed(2)}
+                    //     userId={user?._id}
+                    //     cart={items}
+                    //     selectedAddress={selectedAddress}
+                    //   />
+                    // )} */}
                   </div>
                 </div>
               </div>

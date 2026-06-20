@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import parse from "html-react-parser";
 import afterDiscountPrice from "@/lib/afterDiscountPrice";
+import { getProductFormLabel } from "@/lib/productFormLabels";
 import { addToCart } from "@/store/cartSlice";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
@@ -32,7 +33,8 @@ export default function BookDetail({ book }) {
   if (!book) return null;
 
   const title = book?.descriptiveDetail?.titles?.[0]?.text || "Untitled";
-  const format = "Paperback";
+  const formatLabel = getProductFormLabel(book);
+  const ebookFormat = book?.ebookCategories?.[0] || null;
   const publisher = book?.publishingDetail?.publisher?.name || "Unknown";
   const publishingDate = formatDate(book?.publishingDetail?.publishingDate);
   const isbn = book?.productIdentifiers?.[0]?.value || "--";
@@ -58,9 +60,22 @@ export default function BookDetail({ book }) {
   const price = afterDiscountPrice(originalPrice, discountPercent);
 
   const [expandDescription, setExpandDescription] = useState(false);
+  const [selectedFormatId, setSelectedFormatId] = useState(book._id);
+
+  const formats = [
+    {
+      id: book._id,
+      label: formatLabel,
+      price,
+      originalPrice,
+      discountPercent,
+    },
+  ];
 
   const addToBasket = () => {
-    dispatch(addToCart({ bookId: book._id, quantity: 1 }));
+    dispatch(
+      addToCart({ bookId: book._id, quantity: 1, ebookFormat })
+    );
     toast.success("Product added to cart");
   };
 
@@ -93,7 +108,6 @@ export default function BookDetail({ book }) {
             )}
 
             <div className="space-y-2 text-sm">
-              <p><b>Format:</b> {format}</p>
               <p><b>Publisher:</b> {publisher}</p>
               <p><b>Publishing Date:</b> {publishingDate}</p>
               <p><b>Categories:</b> {categories}</p>
@@ -101,15 +115,39 @@ export default function BookDetail({ book }) {
             </div>
           </div>
 
-          <div className="border p-4 space-y-3">
-            <div className="flex items-center justify-center gap-4">
-              <span className="line-through text-gray-400">£{originalPrice}</span>
-              <span className="text-2xl font-bold">£{price}</span>
-              {discountPercent > 0 && (
-                <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">
-                  - {discountPercent}%
-                </span>
-              )}
+          {/* Formats */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Formats:</h3>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {formats.map((fmt) => {
+                const selected = fmt.id === selectedFormatId;
+                return (
+                  <button
+                    key={fmt.id}
+                    type="button"
+                    onClick={() => setSelectedFormatId(fmt.id)}
+                    className={`min-w-[7rem] flex-1 max-w-[9rem] px-4 py-3 text-center border transition cursor-pointer
+                      ${
+                        selected
+                          ? "bg-white border-black border-b-4"
+                          : "bg-white border-gray-300 hover:border-black"
+                      }`}
+                  >
+                    <span className="block text-sm font-medium">{fmt.label}</span>
+                    <span className="block text-sm mt-1">
+                      {Number(fmt.discountPercent) > 0 && (
+                        <span className="line-through text-gray-400 mr-1">
+                          £{fmt.originalPrice}
+                        </span>
+                      )}
+                      £{fmt.price}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {book?.isSellable &&
