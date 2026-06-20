@@ -14,6 +14,7 @@ import {
   faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import api from "@/lib/api";
+import { LEGAL_LINKS } from "@/lib/legalLinks";
 
 /* ---------------- Validation Schema ---------------- */
 const signUpSchema = Yup.object({
@@ -221,12 +222,25 @@ export default function UserSignUp() {
             <Field
               type="checkbox"
               name="agreeTerms"
-              className="mt-1"
+              id="signup-agree-terms"
+              className="mt-1 shrink-0"
             />
             <p className="text-sm text-gray-600">
-              I agree to the{" "}
-              <Link href="/terms" className="text-[#FF6A00]">
-                Terms & Conditions
+              <label htmlFor="signup-agree-terms" className="cursor-pointer">
+                I agree to the
+              </label>{" "}
+              <Link
+                href={LEGAL_LINKS.terms.href}
+                className="text-[#FF6A00] hover:underline"
+              >
+                {LEGAL_LINKS.terms.label}
+              </Link>{" "}
+              and{" "}
+              <Link
+                href={LEGAL_LINKS.privacy.href}
+                className="text-[#FF6A00] hover:underline"
+              >
+                {LEGAL_LINKS.privacy.label}
               </Link>
             </p>
           </div>

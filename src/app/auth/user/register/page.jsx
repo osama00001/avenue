@@ -15,6 +15,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { LEGAL_LINKS } from "@/lib/legalLinks";
 
 export default function UserRegisterPage() {
   const router = useRouter();
@@ -289,24 +290,26 @@ export default function UserRegisterPage() {
                 id="terms"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-[#FF6A00] focus:ring-[#FF6A00] cursor-pointer mt-0.5"
+                className="w-5 h-5 rounded border-gray-300 text-[#FF6A00] focus:ring-[#FF6A00] cursor-pointer mt-0.5 shrink-0"
               />
-              <label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to the{" "}
+              <p className="text-sm text-gray-600">
+                <label htmlFor="terms" className="cursor-pointer">
+                  I agree to the
+                </label>{" "}
                 <Link
-                  href="/terms"
+                  href={LEGAL_LINKS.terms.href}
                   className="text-[#FF6A00] font-medium hover:underline"
                 >
-                  Terms & Conditions
+                  {LEGAL_LINKS.terms.label}
                 </Link>{" "}
                 and{" "}
                 <Link
-                  href="/privacy"
+                  href={LEGAL_LINKS.privacy.href}
                   className="text-[#FF6A00] font-medium hover:underline"
                 >
-                  Privacy Policy
+                  {LEGAL_LINKS.privacy.label}
                 </Link>
-              </label>
+              </p>
             </div>
 
             {/* REGISTER BUTTON */}

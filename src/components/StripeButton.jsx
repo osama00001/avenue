@@ -12,40 +12,86 @@ import { useDispatch } from "react-redux";
 import { clearCart } from "@/store/cartSlice";
 import toast from "react-hot-toast";
 
-// Loaded once per app
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
 
-/**
- * Outer component — fetches a PaymentIntent client_secret on mount, then
- * renders <Elements> with that secret so the inner form can confirm payment.
- */
-export default function StripeButton({ amount, userId, cart, selectedAddress }) {
-  const [clientSecret, setClientSecret]   = useState(null);
+function getBookId(item) {
+  return item?.book?._id || item?.book;
+}
+
+function buildCartPayload(cart) {
+  return (cart || [])
+    .map((item) => ({
+      bookId: getBookId(item),
+      quantity: item.quantity || 1,
+      ebookFormat: item.ebookFormat || null,
+    }))
+    .filter((item) => item.bookId);
+}
+
+export default function StripeButton({ userId, cart, selectedAddress }) {
+  const [clientSecret, setClientSecret] = useState(null);
   const [paymentIntentId, setPaymentIntentId] = useState(null);
-  const [error, setError]                 = useState(null);
+  const [error, setError] = useState(null);
+  const [loadingIntent, setLoadingIntent] = useState(false);
 
   useEffect(() => {
-    if (!cart?.length || !selectedAddress) return;
+    if (!publishableKey) {
+      setError("Stripe is not configured (missing publishable key).");
+      return;
+    }
+
+    const payload = buildCartPayload(cart);
+    if (!payload.length || !selectedAddress || !userId) return;
+
+    let cancelled = false;
+    setLoadingIntent(true);
+    setError(null);
+    setClientSecret(null);
 
     fetch("/api/stripe/create-payment-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        cart: cart.map(i => ({ bookId: i.book._id, quantity: i.quantity })),
-      }),
+      credentials: "include",
+      body: JSON.stringify({ userId, cart: payload }),
     })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) { setError(data.error); return; }
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || "Failed to start payment");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
         setClientSecret(data.clientSecret);
         setPaymentIntentId(data.paymentIntentId);
       })
-      .catch(err => setError(err.message));
+      .catch((err) => {
+        if (!cancelled) setError(err.message || "Payment setup failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIntent(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [cart, userId, selectedAddress]);
 
-  if (error) return <div className="text-red-600 text-sm">Stripe error: {error}</div>;
-  if (!clientSecret) return <div className="text-gray-500 text-sm">Loading payment form…</div>;
+  if (!publishableKey) {
+    return (
+      <div className="text-red-600 text-sm">
+        Stripe is not configured. Contact support.
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-red-600 text-sm">Stripe error: {error}</div>;
+  }
+
+  if (loadingIntent || !clientSecret) {
+    return <div className="text-gray-500 text-sm">Loading payment form…</div>;
+  }
 
   return (
     <Elements
@@ -65,72 +111,84 @@ export default function StripeButton({ amount, userId, cart, selectedAddress }) 
   );
 }
 
-/**
- * Inner form — actually submits the card via Stripe SDK and, on success,
- * POSTs to /api/orders/create so the order is recorded in Mongo.
- */
 function CardForm({ userId, cart, selectedAddress, paymentIntentId }) {
-  const stripe   = useStripe();
+  const stripe = useStripe();
   const elements = useElements();
-  const router   = useRouter();
+  const router = useRouter();
   const dispatch = useDispatch();
-
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+
+    if (!stripe || !elements) {
+      toast.error("Payment form is still loading. Please wait a moment.");
+      return;
+    }
 
     setSubmitting(true);
 
-    // 1. Confirm payment with Stripe
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-      confirmParams: {
-        return_url: `${window.location.origin}/checkout/thank-you`,
-      },
-    });
-
-    if (error) {
-      toast.error(error.message || "Payment failed");
-      setSubmitting(false);
-      return;
-    }
-
-    if (paymentIntent?.status !== "succeeded") {
-      toast.error(`Payment status: ${paymentIntent?.status}`);
-      setSubmitting(false);
-      return;
-    }
-
-    // 2. Record the order in our DB
     try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: "if_required",
+        confirmParams: {
+          return_url: `${window.location.origin}/checkout/thank-you`,
+        },
+      });
+
+      if (error) {
+        toast.error(error.message || "Payment failed");
+        return;
+      }
+
+      if (!paymentIntent?.id) {
+        toast.error("Payment did not complete. Please try again.");
+        return;
+      }
+
+      if (paymentIntent.status !== "succeeded") {
+        toast.error(`Payment not completed (${paymentIntent.status}). Please try again.`);
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
       const res = await fetch("/api/orders/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: controller.signal,
         body: JSON.stringify({
           userId,
-          cart: cart.map(i => ({
-            bookId:      i.book._id,
-            quantity:    i.quantity,
-            ebookFormat: i.ebookFormat || null,
-          })),
+          cart: buildCartPayload(cart),
           shippingAddress: selectedAddress,
-          paymentMethod:   "STRIPE",
-          stripeIntent:    paymentIntent,
+          paymentMethod: "STRIPE",
+          stripeIntentId: paymentIntent.id,
         }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Order creation failed");
+
+      clearTimeout(timeoutId);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Order creation failed");
+      }
 
       dispatch(clearCart());
       toast.success("Payment successful — order placed");
       router.push(`/checkout/thank-you?order=${data.order._id}`);
     } catch (err) {
-      // Webhook will reconcile if we crash here, but tell the user something
-      toast.error("Payment captured but order recording failed — we'll reconcile from Stripe. Check email shortly.");
-      console.error(err);
+      if (err?.name === "AbortError") {
+        toast.error(
+          "Order recording timed out. If payment was taken, we will confirm by email."
+        );
+      } else {
+        toast.error(err.message || "Something went wrong. Please try again.");
+      }
+      console.error("[StripeButton]", err);
     } finally {
       setSubmitting(false);
     }
@@ -141,7 +199,7 @@ function CardForm({ userId, cart, selectedAddress, paymentIntentId }) {
       <PaymentElement />
       <button
         type="submit"
-        disabled={!stripe || submitting}
+        disabled={!stripe || !elements || submitting}
         className={`w-full py-3 rounded-lg text-white ${
           submitting
             ? "bg-gray-400 cursor-not-allowed"
