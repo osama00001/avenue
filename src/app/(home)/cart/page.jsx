@@ -11,6 +11,7 @@ import {
 } from "@/store/cartSlice";
 import { useEffect, useState } from "react";
 import reverseName from "@/lib/reverseName";
+import { getProductFormLabel } from "@/lib/productFormLabels";
 import { useRouter } from "next/navigation";
 import { fetchUserDetails } from "@/store/userSlice";
 import CheckoutSteps from "@/components/checkout/CheckoutSteps";
@@ -87,7 +88,7 @@ export default function CartPage() {
   const dispatch = useDispatch();
   const { items = [] } = useSelector((state) => state.cart);
   const router = useRouter();
-  const [imgError, setImgError] = useState(false);
+  const [imgError, setImgError] = useState(new Array(items.length).fill(false));
   useEffect(() => {
     dispatch(fetchCart());
     dispatch(fetchUserDetails());
@@ -165,8 +166,13 @@ export default function CartPage() {
                   const title = getTitle(book);
                   const author = getAuthor(book);
                   const original = getOriginalPrice(book);
+                  const discountPercent = getDiscountPercent(book);
                   const price = getFinalPrice(book);
-                  const discounted = price < original;
+                  const formatLabel =
+                    item.ebookFormat || getProductFormLabel(book);
+                  const formatOriginalPrice = Number(original).toFixed(2);
+                  const formatDiscountPercent = Number(discountPercent).toFixed(2);
+                  const formatPrice = price.toFixed(2);
 
                   return (
                     <div
@@ -175,7 +181,7 @@ export default function CartPage() {
                     >
                       {/* IMAGE */}
                       <div className="relative w-16 h-24 flex-shrink-0 bg-gray-50 flex items-center justify-center">
-                        {book.coverImage || book.recordReference && !imgError ? (
+                        {book.coverImage || book.recordReference && !imgError[items.indexOf(item)] ? (
                           <Image
                             src={
                               book.coverImage ||
@@ -186,7 +192,11 @@ export default function CartPage() {
                             className="object-contain"
                             sizes="64px"
                             unoptimized={true}
-                            onError={() => setImgError(true)}
+                            onError={() => setImgError((prev) => {
+                              const newErrors = [...prev];
+                              newErrors[items.indexOf(item)] = true;
+                              return newErrors;
+                            })}
                           />
                         ) : (
                           <span className="text-gray-400 text-[8px] text-center px-1">
@@ -202,21 +212,27 @@ export default function CartPage() {
                             {title}
                           </h3>
                         </Link>
-                        <div
-                          className="text-sm"
-                        >
-                          {author}
-                        </div>
+                        <div className="text-sm">{author}</div>
 
-                        <div className="mt-1 text-sm">
-                          {discounted && (
-                            <span className="text-gray-400 line-through mr-2">
-                              £{original.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="font-semibold">
-                            £{price.toFixed(2)}
-                          </span>
+                        <div className="mt-3 space-y-2">
+                          <h4 className="text-sm font-semibold">Formats:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            <div
+                              className="min-w-[7rem] flex-1 max-w-[9rem] px-4 py-3 text-center border bg-white border-black border-b-4"
+                            >
+                              <span className="block text-sm font-medium">
+                                {formatLabel}
+                              </span>
+                              <span className="block text-sm mt-1">
+                                {Number(formatDiscountPercent) > 0 && (
+                                  <span className="line-through text-gray-400 mr-1">
+                                    £{formatOriginalPrice}
+                                  </span>
+                                )}
+                                £{formatPrice}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
                         <button

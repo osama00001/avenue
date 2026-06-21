@@ -155,12 +155,14 @@ export default function BookDetail({ book }) {
                 book?.availabilityStatus
               ) && (
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => router.push("/auth/user/login")}
-                    className="w-full border cursor-pointer text-black px-6 py-3 font-semibold hover:bg-black hover:text-white transition"
-                  >
-                    Sign in to Add to Wishlist
-                  </button>
+                  {!user && (
+                    <button
+                      onClick={() => router.push("/auth/user/login")}
+                      className="w-full border cursor-pointer text-black px-6 py-3 font-semibold hover:bg-black hover:text-white transition"
+                    >
+                      Sign in to Add to Wishlist
+                    </button>
+                  )}
 
                   <button
                     onClick={addToBasket}
