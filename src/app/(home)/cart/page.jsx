@@ -11,7 +11,7 @@ import {
 } from "@/store/cartSlice";
 import { useEffect, useState } from "react";
 import reverseName from "@/lib/reverseName";
-import { getProductFormLabel } from "@/lib/productFormLabels";
+import BookFormatSection from "@/components/BookFormatSection";
 import { useRouter } from "next/navigation";
 import { fetchUserDetails } from "@/store/userSlice";
 import CheckoutSteps from "@/components/checkout/CheckoutSteps";
@@ -168,8 +168,6 @@ export default function CartPage() {
                   const original = getOriginalPrice(book);
                   const discountPercent = getDiscountPercent(book);
                   const price = getFinalPrice(book);
-                  const formatLabel =
-                    item.ebookFormat || getProductFormLabel(book);
                   const formatOriginalPrice = Number(original).toFixed(2);
                   const formatDiscountPercent = Number(discountPercent).toFixed(2);
                   const formatPrice = price.toFixed(2);
@@ -214,25 +212,13 @@ export default function CartPage() {
                         </Link>
                         <div className="text-sm">{author}</div>
 
-                        <div className="mt-3 space-y-2">
-                          <h4 className="text-sm font-semibold">Formats:</h4>
-                          <div className="flex flex-wrap gap-2">
-                            <div
-                              className="min-w-[7rem] flex-1 max-w-[9rem] px-4 py-3 text-center border bg-white border-black border-b-4"
-                            >
-                              <span className="block text-sm font-medium">
-                                {formatLabel}
-                              </span>
-                              <span className="block text-sm mt-1">
-                                {Number(formatDiscountPercent) > 0 && (
-                                  <span className="line-through text-gray-400 mr-1">
-                                    £{formatOriginalPrice}
-                                  </span>
-                                )}
-                                £{formatPrice}
-                              </span>
-                            </div>
-                          </div>
+                        <div className="mt-3">
+                          <BookFormatSection
+                            book={book}
+                            price={formatPrice}
+                            originalPrice={formatOriginalPrice}
+                            discountPercent={formatDiscountPercent}
+                          />
                         </div>
 
                         <button

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import parse from "html-react-parser";
 import afterDiscountPrice from "@/lib/afterDiscountPrice";
-import { getProductFormLabel } from "@/lib/productFormLabels";
+import BookFormatSection from "@/components/BookFormatSection";
 import { addToCart } from "@/store/cartSlice";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -31,12 +31,11 @@ export default function BookDetail({ book }) {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.user);
   const [expandDescription, setExpandDescription] = useState(false);
-  const [selectedFormatId, setSelectedFormatId] = useState(book?._id ?? null);
+  const [imgError, setImgError] = useState(false);
 
   if (!book) return null;
 
   const title = book?.descriptiveDetail?.titles?.[0]?.text || "Untitled";
-  const formatLabel = getProductFormLabel(book);
   const ebookFormat = book?.ebookCategories?.[0] || null;
   const publisher = book?.publishingDetail?.publisher?.name || "Unknown";
   const publishingDate = formatDate(book?.publishingDetail?.publishingDate);
@@ -62,16 +61,6 @@ export default function BookDetail({ book }) {
 
   const price = afterDiscountPrice(originalPrice, discountPercent);
 
-  const formats = [
-    {
-      id: book._id,
-      label: formatLabel,
-      price,
-      originalPrice,
-      discountPercent,
-    },
-  ];
-
   const addToBasket = () => {
     dispatch(
       addToCart({ bookId: book._id, quantity: 1, ebookFormat })
@@ -84,15 +73,21 @@ export default function BookDetail({ book }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="p-4 flex justify-center">
           <div className="relative w-[320px] h-[480px] bg-gray-100">
+            {
+              book.image && !imgError ? (
             <Image
               src={book.image}
               alt={title}
-              fill
-              priority
-              sizes="(max-width: 768px) 100vw, 320px"
-              className="object-contain"
-              unoptimized={true}
-            />
+                fill
+                priority
+                sizes="(max-width: 768px) 100vw, 320px"
+                className="object-contain"
+                unoptimized={true}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <span className="text-gray-400 text-md text-center px-1 w-full h-full flex items-center justify-center bg-gray-100">{title}</span>
+            )}
           </div>
         </div>
 
@@ -115,40 +110,14 @@ export default function BookDetail({ book }) {
             </div>
           </div>
 
-          {/* Formats */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Formats:</h3>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {formats.map((fmt) => {
-                const selected = fmt.id === selectedFormatId;
-                return (
-                  <button
-                    key={fmt.id}
-                    type="button"
-                    onClick={() => setSelectedFormatId(fmt.id)}
-                    className={`min-w-[7rem] flex-1 max-w-[9rem] px-4 py-3 text-center border transition cursor-pointer
-                      ${
-                        selected
-                          ? "bg-white border-black border-b-4"
-                          : "bg-white border-gray-300 hover:border-black"
-                      }`}
-                  >
-                    <span className="block text-sm font-medium">{fmt.label}</span>
-                    <span className="block text-sm mt-1">
-                      {Number(fmt.discountPercent) > 0 && (
-                        <span className="line-through text-gray-400 mr-1">
-                          £{fmt.originalPrice}
-                        </span>
-                      )}
-                      £{fmt.price}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <BookFormatSection
+              book={book}
+              price={price}
+              originalPrice={originalPrice}
+              discountPercent={discountPercent}
+              interactive
+            />
 
             {book?.isSellable &&
               ["in_stock", "available", "to_order", "unknown", "pod"].includes(

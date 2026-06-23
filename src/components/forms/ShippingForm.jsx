@@ -3,6 +3,8 @@
 import React from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
+import AddressLocationFields from "@/components/forms/AddressLocationFields";
+import { DEFAULT_COUNTRY } from "@/lib/countries";
 
 // ================= Validation =================
 
@@ -41,36 +43,23 @@ const ShippingForm = ({ onSubmit }) => {
           city: "",
           state: "",
           postalCode: "",
-          country: "UK",
+          country: DEFAULT_COUNTRY,
         }}
         validationSchema={schema}
         onSubmit={onSubmit}
       >
-        {() => (
+        {({ values, setFieldValue }) => (
           <Form className="space-y-4">
-            {/* Name */}
             <Input name="name" label="Full Name" />
-
-            {/* Phone */}
             <Input name="phone" label="Phone" />
-
-            {/* Address */}
             <Input name="line1" label="Address Line 1" />
             <Input name="line2" label="Address Line 2 (Optional)" />
 
-            {/* Row */}
-            <div className="grid grid-cols-2 gap-4">
-              <Input name="city" label="City" />
-              <Input name="state" label="State" />
-            </div>
+            <AddressLocationFields
+              values={values}
+              setFieldValue={setFieldValue}
+            />
 
-            {/* Row */}
-            <div className="grid grid-cols-2 gap-4">
-              <Input name="postalCode" label="Postal Code" />
-              <Input name="country" label="Country" />
-            </div>
-
-            {/* Submit */}
             <button
               type="submit"
               className="w-full mt-4 bg-teal-700 text-white py-3 rounded-lg hover:bg-teal-800 transition"
@@ -86,17 +75,13 @@ const ShippingForm = ({ onSubmit }) => {
 
 export default ShippingForm;
 
-// ================= Reusable Input =================
-
 const Input = ({ name, label }) => (
   <div>
     <label className="text-sm text-gray-600">{label}</label>
-
     <Field
       name={name}
       className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-teal-600"
     />
-
     <ErrorMessage
       name={name}
       component="div"

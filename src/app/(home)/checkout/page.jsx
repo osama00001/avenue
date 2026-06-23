@@ -22,6 +22,7 @@ import StripeButton from "@/components/StripeButton";
 import CheckoutSteps from "@/components/checkout/CheckoutSteps";
 import OrderSidebar from "@/components/checkout/OrderSidebar";
 import AddAddressForm from "@/components/forms/AddAddressForm";
+import { DEFAULT_COUNTRY, isUnitedKingdom } from "@/lib/countries";
 
 const EMPTY_FORM = {
   hasAccount: "no",
@@ -34,7 +35,7 @@ const EMPTY_FORM = {
   city: "",
   state: "",
   postalCode: "",
-  country: "United Kingdom",
+  country: DEFAULT_COUNTRY,
 };
 
 const Page = () => {
@@ -224,7 +225,7 @@ const Page = () => {
     addresses.find((a) => a._id === selectedAddressId)?.country ||
     form.country;
 
-  const isInternational = activeDeliveryCountry !== "United Kingdom";
+  const isInternational = !isUnitedKingdom(activeDeliveryCountry);
 
   const canProceedToPayment = isLogin;
   const PAYMENT_METHODS = [
