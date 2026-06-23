@@ -17,8 +17,7 @@ export default function LogoutButton({ className }) {
 
   return (
     <Button
-      variant="destructive"
-      className={`flex items-center justify-center cursor-pointer w-full px-4 py-3 text-sm ${className}`}
+      className={`flex items-center justify-center cursor-pointer w-full px-4 py-3 text-sm bg-[#1a1a1a] hover:bg-[#262626] text-white ${className}`}
       onClick={() => signOut({ callbackUrl })}
     >
       Logout

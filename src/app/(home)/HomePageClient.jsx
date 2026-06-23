@@ -1103,26 +1103,6 @@ export default function HomePage() {
       </div>
 
       <BlogSection />
-
-      <section className="page-width py-10 md:py-14 border-t border-gray-100">
-        <div className="max-w-4xl mx-auto text-center px-4">
-          <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4">
-            Avenue Bookstore
-          </h1>
-          <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-4">
-            Bringing the bookstore to your door we collate every new release, every
-            book deal and every exciting launch from your favourite brick and mortar
-            stores in one welcoming space – Avenue Bookstore.
-          </p>
-          <p className="text-sm md:text-base text-gray-600 leading-relaxed">
-            Explore our bookstore and discover new worlds, learn new skills, delve
-            deep into the lives of popular figures and take a glimpse into ancient
-            history. We have the latest bestsellers, chuckle inducing children&apos;s
-            books, cultural classics, fantastical fiction and Nobel prize winning
-            nonfiction for you.
-          </p>
-        </div>
-      </section>
     </div>
   );
 }
