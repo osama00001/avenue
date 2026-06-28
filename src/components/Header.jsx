@@ -80,12 +80,7 @@ export default function Header() {
     { label: "E-BOOK", href: "/category/ebooks" },
   ];
 
-  const fallbackUtilityMenu = [
-    { label: "Events", href: "/events" },
-    { label: "Blog", href: "/blog" },
-    { label: "Gift Cards", href: "/gift-cards" },
-    { label: "Win", href: "/win" },
-  ];
+  const fallbackUtilityMenu = [];
 
   const mainMenu =
     navigation?.mainMenu && navigation.mainMenu.length
@@ -402,19 +397,20 @@ export default function Header() {
             );
           })}
 
-          {/* MOBILE UTILITY MENU */}
-          <div className="border-t border-slate-200 pt-4 mt-4 space-y-2">
-            {filteredUtilityMenu.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href || "#"}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 py-2 px-3 rounded hover:bg-slate-100 text-gray-700 text-xs"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          {filteredUtilityMenu.length > 0 && (
+            <div className="border-t border-slate-200 pt-4 mt-4 space-y-2">
+              {filteredUtilityMenu.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href || "#"}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 py-2 px-3 rounded hover:bg-slate-100 text-gray-700 text-xs"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {/* MOBILE AUTH BUTTONS */}
           <div className="border-t border-slate-200 pt-4 mt-4 space-y-2">
