@@ -1,5 +1,5 @@
 import { saveSiteContentMedia } from "@/lib/siteContentMedia";
-import { normalizeStoredMedia } from "@/lib/mediaUrl";
+import { normalizeStoredMedia, pickImageUrl } from "@/lib/mediaUrl";
 import { cmsPageSlug } from "@/lib/footerHref";
 import {
   getSiteSection,
@@ -112,15 +112,19 @@ function normalizeSlide(slide = {}) {
 }
 
 function normalizeQuickLink(item = {}) {
-  const image = normalizeStoredMedia(item.image);
+  const image = normalizeStoredMedia(
+    item.image || (item.imageUrl ? { url: item.imageUrl, id: item.imageId } : null)
+  );
   return {
     id: item.id ?? null,
     label: item.label ?? "",
     href: item.href ?? "",
     alt: item.alt ?? "",
     order: item.order ?? 0,
+    isFeatured: item.isFeatured === true,
     image,
-    imageId: image?.id ?? null,
+    imageId: image?.id ?? item.imageId ?? null,
+    imageUrl: pickImageUrl(item.image) || image?.url || item.imageUrl || null,
   };
 }
 
@@ -179,7 +183,7 @@ function stripImageForWrite(image) {
 }
 
 function prepareSlideForWrite(slide = {}) {
-  const image = stripImageForWrite(slide.image);
+  const image = resolveStoredImageForWrite(slide);
   return {
     id: slide.id,
     title: slide.title ?? "",
@@ -191,20 +195,46 @@ function prepareSlideForWrite(slide = {}) {
   };
 }
 
+function resolveStoredImageForWrite(item = {}) {
+  const direct = stripImageForWrite(item.image);
+  if (direct) return direct;
+
+  const fromUrl = stripImageForWrite(item.imageUrl);
+  if (fromUrl) return fromUrl;
+
+  if (item.imageId) {
+    const id = String(item.imageId).trim();
+    if (id) {
+      return stripImageForWrite({
+        id,
+        url: id.startsWith("/") ? id : `/uploads/site-content/${id}`,
+      });
+    }
+  }
+
+  return null;
+}
+
+function resolveQuickLinkImageForWrite(item = {}) {
+  return resolveStoredImageForWrite(item);
+}
+
 function prepareQuickLinkForWrite(item = {}) {
-  const image = stripImageForWrite(item.image);
+  const image = resolveQuickLinkImageForWrite(item);
+  const label = item.label ?? "";
   return {
     id: item.id,
-    label: item.label ?? "",
+    label,
     href: item.href ?? "",
     alt: item.alt ?? "",
     order: item.order ?? 0,
+    isFeatured: item.isFeatured === true || /must-read/i.test(label),
     ...(image ? { image } : {}),
   };
 }
 
 function prepareBannerForWrite(data = {}) {
-  const image = stripImageForWrite(data.image);
+  const image = resolveStoredImageForWrite(data);
   return {
     title: data.title ?? "",
     subtitle: data.subtitle ?? "",
@@ -300,7 +330,17 @@ export async function saveSiteContentSocialLinks(links = []) {
   return normalizeContentList(saved);
 }
 
-export async function uploadSiteContentImage({ base64, filename, mimeType }) {
+export async function uploadSiteContentImage(input) {
+  if (input?.buffer) {
+    const uploaded = await saveSiteContentMedia({
+      buffer: input.buffer,
+      filename: input.filename || "upload.jpg",
+      mimeType: input.mimeType || "image/jpeg",
+    });
+    return normalizeStoredMedia(uploaded);
+  }
+
+  const { base64, filename, mimeType } = input || {};
   if (!base64) {
     throw new Error("base64 is required");
   }

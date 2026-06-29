@@ -42,16 +42,19 @@ function normalizeFooterLink(link = {}, index = 0) {
 }
 
 function normalizeQuickLink(item = {}, index = 0) {
-  const image = normalizeStoredMedia(item.image);
+  const image = normalizeStoredMedia(
+    item.image || (item.imageUrl ? { url: item.imageUrl, id: item.imageId } : null)
+  );
   return {
     id: item.id ?? item._id?.toString?.() ?? `item-${index}`,
     label: item.label ?? "",
     href: item.href ?? "",
     alt: item.alt ?? "",
     order: item.order ?? index,
+    isFeatured: item.isFeatured === true,
     image,
-    imageId: image?.id ?? null,
-    imageUrl: pickImageUrl(item.image) || image?.url || null,
+    imageId: image?.id ?? item.imageId ?? null,
+    imageUrl: pickImageUrl(item.image) || image?.url || item.imageUrl || null,
   };
 }
 

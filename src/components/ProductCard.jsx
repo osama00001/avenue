@@ -75,7 +75,7 @@ export default function ProductCard({ product }) {
           className={`absolute top-1.5 right-1.5 md:top-2 md:right-2 z-10 transition-opacity duration-200 ${
             inWishlist
               ? "opacity-100"
-              : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              : "opacity-100 fine-hover:opacity-0 fine-hover:group-hover:opacity-100"
           }`}
         >
           <WishlistButton
