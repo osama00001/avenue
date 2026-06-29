@@ -8,7 +8,7 @@ export default function SaleHighlights({ highlights, saletitle, variant = "links
   const imageClass =
     variant === "icons"
       ? "h-24 w-24 shrink-0 object-contain"
-      : "h-32 w-auto max-w-[140px] shrink-0 object-contain";
+      : "shrink-0 object-contain";
 
   return (
     <section className="py-10 px-4 max-w-6xl mx-auto text-center">
